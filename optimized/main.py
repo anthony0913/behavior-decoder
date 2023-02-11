@@ -35,11 +35,21 @@ class Optimizer:
         return 0
 
 class Batcher:
-    def __init__(self, output_column=2):
+    def __init__(self, data, params, constraints, output_column=2, start=5, end=7):
         #generate dictionary to contain params of each run by freqs
-        print()
-        '''
-        output style
-        start_time | end_time | output
-        VVVVVVVVVVVVVVVVVVVVVVVVVVVVVV
-        '''
+        self.start = start
+        self.end = end
+        cleaned_params = self.clean_params(params, output_column)
+
+    def clean_params(self, params, output_column, constraints):
+        #output style >>> [start_time | end_time | output]
+        output = np.zeros((1,3))
+        for trial in range(np.shape(params)[0]):
+            valid_trial = True
+            for constraint in constraints:
+                if params[trial,constraint] != constraints[constraint]:
+                    valid_trial = False
+                    break
+            if valid_trial:
+                output = np.append(output, params[trial, [self.start, self.end, output_column]],axis=0)
+        return output[1:,:]
