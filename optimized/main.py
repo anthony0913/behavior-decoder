@@ -11,12 +11,15 @@ from sklearn.metrics import confusion_matrix, accuracy_score
 
 class Optimizer:
     def __init__(self, data, params, freqs, constraints, scheme="power",
-                 lower_freq=2, upper_freq=40):
+                 lower_freq=2, upper_freq=40, iterations=100):
         #self.data = data #Array containing time series data about the total session
-        #self.params = params #Array containing cleaned trial parameters
-
-        self.primary = self.process_data(scheme, data, params)
+        self.params = params #Array containing cleaned trial parameters
         self.config = freqs
+
+        self.primary = self.process_data(scheme, data, self.params)
+
+        self.acc_mean = 0
+        self.acc_stdev = 0
 
     def process_data(self, scheme, data, params):
         primary = np.zeros((np.shape(data)[0],np.shape(data)[1],np.shape(params)[0]))
@@ -29,12 +32,30 @@ class Optimizer:
         return primary
 
     def optimize(self):
-        training_input, testing_input, training_output, testing_output = train_test_split(
-            data, exp_out, test_size=0.25, stratify = exp_out
-        )
-        testing_input = np.vstack((testing_input, extra_data))
-        testing_output = np.hstack((testing_output, extra_exp_out))
+        for iteration in range(self.iterations):
+            training_input, testing_input, training_output, testing_output = train_test_split(
+                data, exp_out, test_size=0.25, stratify = exp_out
+            )
+            testing_input = np.vstack((testing_input, extra_data))
+            testing_output = np.hstack((testing_output, extra_exp_out))
         return 0
+
+    def shuffle(self, params):
+        #Split trials evenly wrt output type into reduced_trials, dump remaining trials into extra_trials
+        length = min(np.sum(self.params,axis=0)[2], np.shape(params)[0])
+        params = np.shuffle(params)
+        pos_out, neg_out = 0, 0
+
+        reduced_trials = np.zeros(0)
+        extra_params = np.zeros(0)
+
+        for trial in range(np.shape(params)[0]):
+            if (params[trial,2]==1 and pos_out <= length) or \
+                    params[trial,2]==0 and neg_out <= length:
+                reduced_trials = np.append(reduced_trials, params[trial], axis=0)
+            else:
+                extra_trials = np.append(extra_trials, params[trial], axis=0)
+        return reduced_trials, extra_trials
 
 class Batcher:
     def __init__(self, data, params, constraints, output_column=2, start=5, end=7):
@@ -59,11 +80,10 @@ class Batcher:
                 output = np.append(output, params[trial, [self.start, self.end, output_column]],axis=0)
         return output[1:,:]
 
-    def gen_power_matrix(self, length, specify=None):
+    def power_iteration(self, length, specify=None):
         #use np.nonzero later
         #wait don't use np.nonzero (better archiving)
         log = np.zeros((1, length))
-        best_log = np.zeros((1, length))
 
         for i in range(math.factorial(length)):
             stop = False
@@ -73,6 +93,7 @@ class Batcher:
                     log[index]=1
                     stop=True
                 index+=1
+            #insert iterated statement here (account for starting case)
 
     def update_archive(self, new_config):
         #Update archived configurations and corresponding accuracy
