@@ -10,35 +10,30 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix, accuracy_score
 
 class Optimizer:
-    def __init__(self, data, params, freqs, constraints, scheme="power",
+    def __init__(self, data, params, freqs, constraints, scheme="power", #remove scheme redundancy
                  lower_freq=2, upper_freq=40, iterations=100):
         #self.data = data #Array containing time series data about the total session
         self.params = params #Array containing cleaned trial parameters
         self.config = freqs
 
-        self.primary = self.process_data(scheme, data, self.params)
+        #self.primary = self.process_data(scheme, data, self.params)
 
-        self.acc_mean = 0
-        self.acc_stdev = 0
+        self.acc_mean ,self.acc_stdev = self.optimize()
 
-    def process_data(self, scheme, data, params):
-        primary = np.zeros((np.shape(data)[0],np.shape(data)[1],np.shape(params)[0]))
+    def gen_reduced_matrix(self, scheme, data, params):
+        '''
+        Generates a reduced matrix separating individual trials
+        axis 0 - time series -> frequency components
+        axis 1 - neuron
+        axis 2 - trial
+        '''
+        reduced_matrix = np.zeros((np.shape(data)[0],np.shape(data)[1],np.shape(params)[0]))
         for trial in range(np.shape(params)[0]):
-            gamma = data[params[0],params[1],:]
-            gamma = np.real(np.fft.fft(gamma, axis=0))
-            if scheme=="power":
-                primary[:,:,trial] = gamma[self.freqs,:]
+            primitive = data[params[0],params[1],:]
+            primitive = np.real(np.fft.fft(primitive, axis=0))
+            reduced_matrix[:,:,trial] = primitive[self.freqs,:]
         #rescale before returning
-        return primary
-
-    def optimize(self):
-        for iteration in range(self.iterations):
-            training_input, testing_input, training_output, testing_output = train_test_split(
-                data, exp_out, test_size=0.25, stratify = exp_out
-            )
-            testing_input = np.vstack((testing_input, extra_data))
-            testing_output = np.hstack((testing_output, extra_exp_out))
-        return 0
+        return reduced_matrix, params[:,2]
 
     def shuffle(self, params):
         #Split trials evenly wrt output type into reduced_trials, dump remaining trials into extra_trials
@@ -56,6 +51,38 @@ class Optimizer:
             else:
                 extra_trials = np.append(extra_trials, params[trial], axis=0)
         return reduced_trials, extra_trials
+
+    def optimize(self):
+        '''
+        Logging format
+        Accuracy | Noise control
+        '''
+        log = np.zeros(self.iterations)
+        for iteration in range(self.iterations):
+            #Generating necessary components for fitting and testing model
+            reduced_trials, extra_trials = self.shuffle(self.params)
+            primary_matrix, primary_output = self.gen_reduced_matrix(reduced_trials)
+            extra_matrix, extra_output =self.gen_reduced_matrix(extra_trials)
+
+            #Creating the testing/training set split
+            training_input, testing_input, training_output, testing_output = train_test_split(
+                primary_matrix, primary_output, test_size=0.25, stratify = [0,1] #50/50 split
+            )
+            testing_input = np.vstack((testing_input, extra_matrix))
+            testing_output = np.hstack((testing_output, extra_output))
+
+            #SVD fit
+            classifier = SVC(random_state=0, cache_size=7000, kernel="linear")
+            classifier.fit(training_input, training_output)
+
+            #Predictions
+            predicted_output = classifier.predict(testing_input)
+
+            #Logging
+            log[iteration, 0] = accuracy_score(testing_output, predicted_output)
+            #add noise prediction accuracies
+
+        return np.mean(log), np.std(log)
 
 class Batcher:
     def __init__(self, data, params, constraints, output_column=2, start=5, end=7):
