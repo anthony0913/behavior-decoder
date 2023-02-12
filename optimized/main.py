@@ -61,6 +61,7 @@ class Batcher:
 
     def gen_power_matrix(self, length, specify=None):
         #use np.nonzero later
+        #wait don't use np.nonzero (better archiving)
         log = np.zeros((1, length))
         best_log = np.zeros((1, length))
 
@@ -73,15 +74,21 @@ class Batcher:
                     stop=True
                 index+=1
 
-        #keep all models of same accuracy and remove all models of lower accuracy
-
     def update_archive(self, new_config):
+        #Update archived configurations and corresponding accuracy
         new_acc = new_config.acc
         if new_acc > self.acc:
+            #Remove previously archive and accuracy
             self.acc = new_acc
             self.archive = new_config.config
         elif new_acc == self.acc:
+            #Add current configuration to list of configurations corresponding to current accuracy
             self.archive = np.append(self.archive, new_config.config, axis=0)
         elif new_acc < self.acc:
+            #Ignore current configuration
             pass
         #nevermind don't use hashmaps lol
+
+class Pooler:
+    def __init__(self):
+        pass
