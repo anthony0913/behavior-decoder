@@ -16,6 +16,7 @@ class Optimizer:
         #self.params = params #Array containing cleaned trial parameters
 
         self.primary = self.process_data(scheme, data, params)
+        self.config = freqs
 
     def process_data(self, scheme, data, params):
         primary = np.zeros((np.shape(data)[0],np.shape(data)[1],np.shape(params)[0]))
@@ -42,6 +43,9 @@ class Batcher:
         self.end = end
         cleaned_params = self.clean_params(params, output_column)
 
+        self.acc = 0
+        self.archive = np.zeros(1)
+
     def clean_params(self, params, output_column, constraints=None):
         #output style >>> [start_time | end_time | output]
         output = np.zeros((1,3))
@@ -58,6 +62,8 @@ class Batcher:
     def gen_power_matrix(self, length, specify=None):
         #use np.nonzero later
         log = np.zeros((1, length))
+        best_log = np.zeros((1, length))
+
         for i in range(math.factorial(length)):
             stop = False
             index = 0
@@ -66,3 +72,16 @@ class Batcher:
                     log[index]=1
                     stop=True
                 index+=1
+
+        #keep all models of same accuracy and remove all models of lower accuracy
+
+    def update_archive(self, new_config):
+        new_acc = new_config.acc
+        if new_acc > self.acc:
+            self.acc = new_acc
+            self.archive = new_config.config
+        elif new_acc == self.acc:
+            self.archive = np.append(self.archive, new_config.config, axis=0)
+        elif new_acc < self.acc:
+            pass
+        #nevermind don't use hashmaps lol
