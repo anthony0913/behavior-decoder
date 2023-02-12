@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import math
 
 from sklearn.cluster import AffinityPropagation, SpectralClustering, KMeans
 from sklearn.svm import SVC
@@ -41,7 +42,7 @@ class Batcher:
         self.end = end
         cleaned_params = self.clean_params(params, output_column)
 
-    def clean_params(self, params, output_column, constraints):
+    def clean_params(self, params, output_column, constraints=None):
         #output style >>> [start_time | end_time | output]
         output = np.zeros((1,3))
         for trial in range(np.shape(params)[0]):
@@ -53,3 +54,15 @@ class Batcher:
             if valid_trial:
                 output = np.append(output, params[trial, [self.start, self.end, output_column]],axis=0)
         return output[1:,:]
+
+    def gen_power_matrix(self, length, specify=None):
+        #use np.nonzero later
+        log = np.zeros((1, length))
+        for i in range(math.factorial(length)):
+            stop = False
+            index = 0
+            while not stop:
+                if log[index]==0:
+                    log[index]=1
+                    stop=True
+                index+=1
