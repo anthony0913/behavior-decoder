@@ -33,6 +33,7 @@ The **Batcher** class is used to search models made by the **Optimizer** class t
 
 ### Data Formatting
 The data `data` should be prepared in a numpy array with the time series data varying along axis 0 and the recording site (e.g. neurons) varying along axis 1. If pulling from a program like excel, spreadsheet columns should be organized like this.
+
 `cell 1 | cell 2 | ... | cell n`
 
 The trial parameters `params` should also be prepared in a numpy array with individual trials occupying separate rows. The column structure is flexible however, allowing specification later on. For a given trial, the starting time `start_col` should refer to the column of `params` specifying the row of `data` from which the trial begins. The ending time `end_col` follows similarly. Constraints of which trials to be processed can be specified in the hashmap `constraints`.
