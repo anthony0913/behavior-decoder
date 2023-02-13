@@ -9,14 +9,15 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix, accuracy_score
 
 class Optimizer:
-    def __init__(self, data, params, freqs, constraints, iterations=100, shuffles=5):
+    def __init__(self, data, params, freqs, iterations=100, shuffles=5):
         #self.data = data #Array containing time series data about the total session
         self.params = params #Array containing cleaned trial parameters
         self.shuffles = shuffles
         self.config = freqs
+        self.iterations = iterations
 
         #Model evaluation
-        self.acc_mean ,self.acc_stdev = self.optimize()
+        self.acc_mean, self.acc_stdev = self.optimize()
 
     def gen_reduced_matrix(self, data, params):
         '''
