@@ -17,7 +17,7 @@ class Optimizer:
         self.iterations = iterations
 
         #Model evaluation
-        self.acc_mean, self.acc_stdev = self.optimize()
+        self.acc_mean, self.acc_stdev = self.optimize(data)
 
     def gen_reduced_matrix(self, data, params):
         '''
@@ -51,7 +51,7 @@ class Optimizer:
                 extra_trials = np.append(extra_trials, params[trial], axis=0)
         return reduced_trials, extra_trials
 
-    def optimize(self):
+    def optimize(self, data):
         '''
         Logging format
         Accuracy | Noise control
@@ -60,8 +60,8 @@ class Optimizer:
         for iteration in range(self.iterations):
             #Generating necessary components for fitting and testing model
             reduced_trials, extra_trials = self.shuffle(self.params)
-            primary_matrix, primary_output = self.gen_reduced_matrix(reduced_trials)
-            extra_matrix, extra_output =self.gen_reduced_matrix(extra_trials)
+            primary_matrix, primary_output = self.gen_reduced_matrix(data, reduced_trials)
+            extra_matrix, extra_output =self.gen_reduced_matrix(data, extra_trials)
 
             #Creating the testing/training set split
             training_input, testing_input, training_output, testing_output = train_test_split(
