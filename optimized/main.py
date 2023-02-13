@@ -82,14 +82,14 @@ class Optimizer:
         return np.mean(log), np.std(log)
 
 class Batcher:
-    def __init__(self, data, params, constraints, output_column=2, start_col=5, end_col=7):
+    def __init__(self, data, params, constraints, length, output_column=2, start_col=5, end_col=7):
         self.data = data
+        self.constraints = constraints
         self.cleaned_params = self.clean_params(params, start_col, end_col, output_column)
 
-        print(self.acc)
+        self.power_iteration(length)
 
-        #self.acc = 0
-        #self.archive = np.zeros(1)
+        print(self.acc)
 
     def clean_params(self, params, start_col, end_col, output_column, constraints=None):
         #output style >>> [start_time | end_time | output]
@@ -104,24 +104,26 @@ class Batcher:
                 output = np.append(output, params[trial, [start_col, end_col, output_column]],axis=0)
         return output[1:,:]
 
-    def power_iteration(self, length, specify=None):
+    def power_iteration(self, length):
         #use np.nonzero later
         #wait don't use np.nonzero (better archiving)
         log = np.zeros((1, length))
 
         self.acc = 0
-        self.archive = np.zeros(1)
 
         for configuration in range(math.factorial(length)):
             stop = False
             index = 0
             while not stop:
+                #binary counter
                 if log[index]==0:
                     log[index]=1
                     stop=True
+                else:
+                    log[index]=0
                 index+=1
-            #insert iterated statement here (account for starting case)
-            model = Optimizer(self.data, self.cleaned_params, freqs,constraints)
+            #Iterated updating of model archive
+            self.update_archive(Optimizer(self.data, self.cleaned_params, np.nonzero(log), self.constraints))
 
     def continuous_iteration(self):
         #just do it with lower and upper freqs
@@ -129,14 +131,16 @@ class Batcher:
 
     def update_archive(self, new_config):
         #Update archived configurations and corresponding accuracy
-        new_acc = new_config.acc
+        new_acc = new_config.acc_mean
         if new_acc > self.acc:
             #Remove previously archive and accuracy
             self.acc = new_acc
             self.archive = new_config.config
+            self.stdevs = new_config.acc_stdev
         elif new_acc == self.acc:
             #Add current configuration to list of configurations corresponding to current accuracy
             self.archive = np.append(self.archive, new_config.config, axis=0)
+            self.stdevs = np.append(self.stdevs, new_config.acc_stdev)
         elif new_acc < self.acc:
             #Ignore current configuration
             pass
