@@ -80,14 +80,12 @@ class Optimizer:
             interval = int(math.floor(100 / self.shuffles))
             for shuffles in range(self.shuffles):
                 distribution = shuffles / self.shuffles
-                shuffled_output = classifier.predict(testing_input) #redundant?
-                correct_output = np.random.choice([0,1], size=shuffled_output, p=[1-distribution, distribution])
-                log[iteration, shuffles+1] = accuracy_score(shuffled_output, correct_output)
-            baseline = classifier.predict(np.random.)
+                correct_output = np.random.choice([0,1], size=np.shape(predicted_output)[0], p=[1-distribution, distribution])
+                log[iteration, shuffles+1] = accuracy_score(predicted_output, correct_output)
 
-            #Logging
-
-            #add noise prediction accuracies
+            baseline = classifier.predict(np.random.rand(np.shape(testing_output)))
+            half_output = np.random.choice([0,1], size=np.shape(predicted_output)[0], p=[0.5, 0.5])
+            log[iteration, -1] = accuracy_score(baseline, half_output)
 
         return np.mean(log), np.std(log)
 
