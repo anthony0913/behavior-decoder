@@ -4,23 +4,20 @@ import math
 
 from sklearn.cluster import AffinityPropagation, SpectralClustering, KMeans
 from sklearn.svm import SVC
-from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix, accuracy_score
 
 class Optimizer:
-    def __init__(self, data, params, freqs, constraints, scheme="power", #remove scheme redundancy
-                 lower_freq=2, upper_freq=40, iterations=100):
+    def __init__(self, data, params, freqs, constraints, iterations=100):
         #self.data = data #Array containing time series data about the total session
         self.params = params #Array containing cleaned trial parameters
         self.config = freqs
 
-        #self.primary = self.process_data(scheme, data, self.params)
-
+        #Model evaluation
         self.acc_mean ,self.acc_stdev = self.optimize()
 
-    def gen_reduced_matrix(self, scheme, data, params):
+    def gen_reduced_matrix(self, data, params):
         '''
         Generates a reduced matrix separating individual trials
         axis 0 - time series -> frequency components
@@ -85,16 +82,16 @@ class Optimizer:
         return np.mean(log), np.std(log)
 
 class Batcher:
-    def __init__(self, data, params, constraints, output_column=2, start=5, end=7):
-        #generate dictionary to contain params of each run by freqs
-        self.start = start
-        self.end = end
-        cleaned_params = self.clean_params(params, output_column)
+    def __init__(self, data, params, constraints, output_column=2, start_col=5, end_col=7):
+        self.data = data
+        self.cleaned_params = self.clean_params(params, start_col, end_col, output_column)
 
-        self.acc = 0
-        self.archive = np.zeros(1)
+        print(self.acc)
 
-    def clean_params(self, params, output_column, constraints=None):
+        #self.acc = 0
+        #self.archive = np.zeros(1)
+
+    def clean_params(self, params, start_col, end_col, output_column, constraints=None):
         #output style >>> [start_time | end_time | output]
         output = np.zeros((1,3))
         for trial in range(np.shape(params)[0]):
@@ -104,7 +101,7 @@ class Batcher:
                     valid_trial = False
                     break
             if valid_trial:
-                output = np.append(output, params[trial, [self.start, self.end, output_column]],axis=0)
+                output = np.append(output, params[trial, [start_col, end_col, output_column]],axis=0)
         return output[1:,:]
 
     def power_iteration(self, length, specify=None):
@@ -112,7 +109,10 @@ class Batcher:
         #wait don't use np.nonzero (better archiving)
         log = np.zeros((1, length))
 
-        for i in range(math.factorial(length)):
+        self.acc = 0
+        self.archive = np.zeros(1)
+
+        for configuration in range(math.factorial(length)):
             stop = False
             index = 0
             while not stop:
@@ -121,6 +121,11 @@ class Batcher:
                     stop=True
                 index+=1
             #insert iterated statement here (account for starting case)
+            model = Optimizer(self.data, self.cleaned_params, freqs,constraints)
+
+    def continuous_iteration(self):
+        #just do it with lower and upper freqs
+        pass
 
     def update_archive(self, new_config):
         #Update archived configurations and corresponding accuracy
@@ -138,5 +143,7 @@ class Batcher:
         #nevermind don't use hashmaps lol
 
 class Pooler:
+    #Running multiple sessions in parallel
     def __init__(self):
         pass
+
