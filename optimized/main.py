@@ -9,9 +9,10 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix, accuracy_score
 
 class Optimizer:
-    def __init__(self, data, params, freqs, constraints, iterations=100):
+    def __init__(self, data, params, freqs, constraints, iterations=100, shuffles=5):
         #self.data = data #Array containing time series data about the total session
         self.params = params #Array containing cleaned trial parameters
+        self.shuffles = shuffles
         self.config = freqs
 
         #Model evaluation
@@ -54,7 +55,7 @@ class Optimizer:
         Logging format
         Accuracy | Noise control
         '''
-        log = np.zeros(self.iterations)
+        log = np.zeros((self.iterations, 1+self.shuffles))
         for iteration in range(self.iterations):
             #Generating necessary components for fitting and testing model
             reduced_trials, extra_trials = self.shuffle(self.params)
@@ -72,11 +73,20 @@ class Optimizer:
             classifier = SVC(random_state=0, cache_size=7000, kernel="linear")
             classifier.fit(training_input, training_output)
 
-            #Predictions
+            #Predictions and logging
             predicted_output = classifier.predict(testing_input)
+            log[iteration, 0] = accuracy_score(testing_output, predicted_output)
+
+            interval = int(math.floor(100 / self.shuffles))
+            for shuffles in range(self.shuffles):
+                distribution = shuffles / self.shuffles
+                shuffled_output = classifier.predict(testing_input) #redundant?
+                correct_output = np.random.choice([0,1], size=shuffled_output, p=[1-distribution, distribution])
+                log[iteration, shuffles+1] = accuracy_score(shuffled_output, correct_output)
+            baseline = classifier.predict(np.random.)
 
             #Logging
-            log[iteration, 0] = accuracy_score(testing_output, predicted_output)
+
             #add noise prediction accuracies
 
         return np.mean(log), np.std(log)
@@ -88,8 +98,7 @@ class Batcher:
         self.cleaned_params = self.clean_params(params, start_col, end_col, output_column)
 
         self.power_iteration(length)
-
-        print(self.acc)
+        self.get_statistics()
 
     def clean_params(self, params, start_col, end_col, output_column, constraints=None):
         #output style >>> [start_time | end_time | output]
@@ -105,10 +114,8 @@ class Batcher:
         return output[1:,:]
 
     def power_iteration(self, length):
-        #use np.nonzero later
-        #wait don't use np.nonzero (better archiving)
+        #Initial values
         log = np.zeros((1, length))
-
         self.acc = 0
 
         for configuration in range(math.factorial(length)):
@@ -145,6 +152,9 @@ class Batcher:
             #Ignore current configuration
             pass
         #nevermind don't use hashmaps lol
+
+    def get_statistics(self):
+        print("Complete with maximum accuracy as " + self.acc)
 
 class Pooler:
     #Running multiple sessions in parallel
