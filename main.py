@@ -38,7 +38,7 @@ class Optimizer:
     def shuffle(self, params):
         #Split trials evenly wrt output type into reduced_trials, dump remaining trials into extra_trials
         length = min(np.sum(self.params,axis=0)[2], np.shape(params)[0])
-        params = np.shuffle(params)
+        np.random.shuffle(params)
         pos_out, neg_out = 0, 0
 
         reduced_trials = np.zeros(0)
@@ -96,7 +96,8 @@ class Batcher:
                  output_column=2, start_col=5, end_col=7):
         self.data = data
         self.constraints = constraints
-        self.cleaned_params = self.clean_params(params, start_col, end_col, output_column, output_classes)
+        self.cleaned_params = self.clean_params(params, start_col, end_col,
+                                                output_column, output_classes, constraints=constraints)
 
         self.power_iteration(length)
         self.get_statistics()
@@ -111,13 +112,14 @@ class Batcher:
                     valid_trial = False
                     break
             if valid_trial:
-                output_class = output_classes[params[output_column]]#converts output from an object to a numerical value
-                output = np.append(output, params[trial, [start_col, end_col, output_class]],axis=0)
+                output = np.vstack((output, params[trial, [start_col, end_col, output_column]]))
+        for trial in range(1,np.shape(output)[0]):
+            output[trial, -1] = output_classes[output[trial, -1]]#converts output from an object to a numerical value
         return output[1:,:]
 
     def power_iteration(self, length):
         #Initial values
-        log = np.zeros((1, length))
+        log = np.zeros(length)
         self.acc = 0
 
         for configuration in range(math.factorial(length)):
@@ -125,6 +127,7 @@ class Batcher:
             index = 0
             while not stop:
                 #binary counter
+                print(log[index])
                 if log[index]==0:
                     log[index]=1
                     stop=True
@@ -132,7 +135,7 @@ class Batcher:
                     log[index]=0
                 index+=1
             #Iterated updating of model archive
-            self.update_archive(Optimizer(self.data, self.cleaned_params, np.nonzero(log), self.constraints))
+            self.update_archive(Optimizer(data=self.data, params=self.cleaned_params, freqs=np.nonzero(log)))
 
     def continuous_iteration(self):
         #just do it with lower and upper freqs
@@ -171,16 +174,16 @@ class Pooler:
         #Extracts data and params from csv into a numpy array formatted for the Batcher class
 
         with open(data_path, newline='') as f:
-            reader = csv.reader(f)
+            reader = csv.reader(f, delimiter=',')
             data_array = [row for row in reader][1:]
         data = np.array(data_array, dtype=np.float32)[:, 1:]
 
         with open(param_path, newline='') as f:
-            reader = csv.reader(f)
+            reader = csv.reader(f, delimiter=',')
             params_array = list(reader)[1:]
         params = np.array(params_array, dtype=object)
 
         return data, params
 
 pool = Pooler(["data.csv"], ["params.csv"])
-batch = Batcher(pool.data, pool.params, {1:"FTP", 4:"clean"}, length=10, output_classes={0:"wrong", 1:"correct"}, output_column=3, start_col=5, end_col=7)
+batch = Batcher(pool.data, pool.params, constraints={1:"FTP", 4:"clean"}, length=10, output_classes={"wrong":0, "correct":1}, output_column=3, start_col=5, end_col=7)
