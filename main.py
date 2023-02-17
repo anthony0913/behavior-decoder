@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import math
+import csv
 
 from sklearn.cluster import AffinityPropagation, SpectralClustering, KMeans
 from sklearn.svm import SVC
@@ -157,6 +158,22 @@ class Batcher:
 
 class Pooler:
     #Running multiple sessions in parallel
-    def __init__(self):
-        pass
+    def __init__(self, data_paths, params_paths, parallel=False):
+        self.data_paths = data_paths
+        self.param_paths = params_paths
 
+        if not parallel:
+            self.data, self.params = self.single_run(self.data_paths[0], self.params_paths[0])
+
+    def single_run(self, data_path, param_path):
+        with open(data_path, newline='') as f:
+            reader = csv.reader(f)
+            data_array = [row for row in reader][1:]
+        data = np.array(data_array, dtype=np.float32)[:, 1:]
+
+        with open('data.csv', newline='') as f:
+            reader = csv.reader(f)
+            params_array = list(reader)[1:]
+        params = np.array(params_array, dtype=object)
+
+        return data, params
