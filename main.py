@@ -163,17 +163,22 @@ class Pooler:
         self.param_paths = params_paths
 
         if not parallel:
-            self.data, self.params = self.single_run(self.data_paths[0], self.params_paths[0])
+            self.data, self.params = self.single_run(self.data_paths[0], self.param_paths[0])
 
     def single_run(self, data_path, param_path):
+        #Extracts data and params from csv into a numpy array formatted for the Batcher class
+
         with open(data_path, newline='') as f:
             reader = csv.reader(f)
             data_array = [row for row in reader][1:]
         data = np.array(data_array, dtype=np.float32)[:, 1:]
 
-        with open('data.csv', newline='') as f:
+        with open(param_path, newline='') as f:
             reader = csv.reader(f)
             params_array = list(reader)[1:]
         params = np.array(params_array, dtype=object)
 
         return data, params
+
+pool = Pooler(["data.csv"], ["params.csv"])
+batch = Batcher(pool.data, pool.params, {1:"FTP", 4:"clean"}, length=10, output_column=3, start_col=5, end_col=7)
