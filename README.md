@@ -1,7 +1,7 @@
 # How to use
 This script searches for singular value decomposition (SVD) models that best describe a given dataset. In particular, SVD is applied to the component frequencies of multiple time series recordings to describe two-choice phenomena that may occur several times within a single recording session, e.g., predicting the results of a behavior testing session that contains 150 trials from time series data of 200 neuron recordings. 
 
-The primary module is found in `optimized/main.py` See details regarding each class and their available methods below.
+The primary module is found in `main.py` See details regarding each class and their available methods below.
 
 ## Optimizer
 
@@ -39,9 +39,9 @@ The data `data` should be prepared in a numpy array with the time series data va
 The trial parameters `params` should also be prepared in a numpy array with individual trials occupying separate rows. The column structure is flexible however, allowing specification later on. For a given trial, the starting time `start_col` should refer to the column of `params` specifying the row of `data` from which the trial begins. The ending time `end_col` follows similarly. Constraints of which trials to be processed can be specified in the hashmap `constraints`.
 
 ### Example
-We will initialize a search of the power set of available frequency bands where we have the constraints that trials specified in `params` must have their third (index=2) column specify "left" and that the ninth (index=8) column specifies 3. The start and end columns are 6 and 8 (indicies 5 and 7) respectively.
+We will initialize a search of the power set of available frequency bands where we have the constraints that trials specified in `params` must have their third (index=2) column specify "left" and that the ninth (index=8) column specifies 3. The start and end columns are 6 and 8 (indicies 5 and 7) respectively. The two output classes that the model can predict, i.e., the entries present in the output column, are "cat" and "dog".
 
-`Batch = Batcher(data, params, constraints={2:"left", 8:3}, length, output_column=2, start_col=5, end_col=7)`
+`Batch = Batcher(data, params, constraints={2:"left", 8:3}, length, output_classes={0:"cat", 1:"dog"}, output_column=2, start_col=5, end_col=7)`
 
 ## Pooler
 to be implemented
