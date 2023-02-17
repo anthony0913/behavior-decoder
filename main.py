@@ -92,15 +92,16 @@ class Optimizer:
         return np.mean(log), np.std(log)
 
 class Batcher:
-    def __init__(self, data, params, constraints, length, output_column=2, start_col=5, end_col=7):
+    def __init__(self, data, params, constraints, length, output_classes,
+                 output_column=2, start_col=5, end_col=7):
         self.data = data
         self.constraints = constraints
-        self.cleaned_params = self.clean_params(params, start_col, end_col, output_column)
+        self.cleaned_params = self.clean_params(params, start_col, end_col, output_column, output_classes)
 
         self.power_iteration(length)
         self.get_statistics()
 
-    def clean_params(self, params, start_col, end_col, output_column, constraints=None):
+    def clean_params(self, params, start_col, end_col, output_column, output_classes, constraints=None):
         #output style >>> [start_time | end_time | output]
         output = np.zeros((1,3))
         for trial in range(np.shape(params)[0]):
@@ -110,7 +111,8 @@ class Batcher:
                     valid_trial = False
                     break
             if valid_trial:
-                output = np.append(output, params[trial, [start_col, end_col, output_column]],axis=0)
+                output_class = output_classes[params[output_column]]#converts output from an object to a numerical value
+                output = np.append(output, params[trial, [start_col, end_col, output_class]],axis=0)
         return output[1:,:]
 
     def power_iteration(self, length):
@@ -181,4 +183,4 @@ class Pooler:
         return data, params
 
 pool = Pooler(["data.csv"], ["params.csv"])
-batch = Batcher(pool.data, pool.params, {1:"FTP", 4:"clean"}, length=10, output_column=3, start_col=5, end_col=7)
+batch = Batcher(pool.data, pool.params, {1:"FTP", 4:"clean"}, length=10, output_classes={0:"wrong", 1:"correct"}, output_column=3, start_col=5, end_col=7)
