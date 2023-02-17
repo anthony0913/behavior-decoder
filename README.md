@@ -41,7 +41,7 @@ The trial parameters `params` should also be prepared in a numpy array with indi
 ### Example
 We will initialize a search of the power set of available frequency bands where we have the constraints that trials specified in `params` must have their third (index=2) column specify "left" and that the ninth (index=8) column specifies 3. The start and end columns are 6 and 8 (indicies 5 and 7) respectively. The two output classes that the model can predict, i.e., the entries present in the output column, are "cat" and "dog".
 
-`Batch = Batcher(data, params, constraints={2:"left", 8:3}, length, output_classes={0:"cat", 1:"dog"}, output_column=2, start_col=5, end_col=7)`
+`Batch = Batcher(data, params, constraints={2:"left", 8:3}, length, output_classes={"cat":0, "dog":1}, output_column=2, start_col=5, end_col=7)`
 
 ## Pooler
 to be implemented
