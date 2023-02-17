@@ -32,11 +32,11 @@ The **Batcher** class is used to search models made by the **Optimizer** class t
  |combination| The restriction of the power set to subsets of length *m* is searched | $$_nC_m$$
 
 ### Data Formatting
-The data `data` should be prepared in a numpy array with the time series data varying along axis 0 and the recording site (e.g. neurons) varying along axis 1. If pulling from a program like excel, spreadsheet columns should be organized like this.
+The data `data` should be prepared in a numpy array with the time series data varying along axis 0 and the recording site (e.g. neurons) varying along axis 1. If pulling from a program like excel, spreadsheet columns should be organized like this. (Note that the first row and/or column can be ignored by changing the options `ignoreFirstRow` and `ignoreFirstColumn`)
 
 `cell 1 | cell 2 | ... | cell n`
 
-The trial parameters `params` should also be prepared in a numpy array with individual trials occupying separate rows. The column structure is flexible however, allowing specification later on. For a given trial, the starting time `start_col` should refer to the column of `params` specifying the row of `data` from which the trial begins. The ending time `end_col` follows similarly. Constraints of which trials to be processed can be specified in the hashmap `constraints`.
+The trial parameters `params` should also be prepared in a numpy array with individual trials occupying separate rows. The column structure is flexible however, allowing specification later on (again, turn off the first row with `ignoreFirstRow`). For a given trial, the starting time `start_col` should refer to the column of `params` specifying the row of `data` from which the trial begins. The ending time `end_col` follows similarly. Constraints of which trials to be processed can be specified in the hashmap `constraints`.
 
 ### Example
 We will initialize a search of the power set of available frequency bands where we have the constraints that trials specified in `params` must have their third (index=2) column specify "left" and that the ninth (index=8) column specifies 3. The start and end columns are 6 and 8 (indicies 5 and 7) respectively. The two output classes that the model can predict, i.e., the entries present in the output column, are "cat" and "dog".
