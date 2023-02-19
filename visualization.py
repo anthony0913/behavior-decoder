@@ -48,7 +48,7 @@ class Transform:
         self.blocks_1 = None
         self.blocks_0 = None
 
-    def get_blocks(self, cleaned_params):
+    def get_blocks(self, cleaned_params, normalize=False):
         blocks = []
         with open(self.session_file, 'r') as session_csv:
             session_reader = csv.reader(session_csv)
@@ -62,11 +62,14 @@ class Transform:
         blocks_ft = np.fft.rfft(blocks, axis=0).real
         trimmed_blocks = blocks_ft[:10, :]
         stacked_blocks = np.stack([trimmed_blocks] * cleaned_params.shape[0], axis=2)
+        if normalize:
+            stacked_blocks -= stacked_blocks.min(axis=(0, 1), keepdims=True)
+            stacked_blocks /= stacked_blocks.max(axis=(0, 1), keepdims=True)
         return stacked_blocks
 
-    def generate_heatmaps(self, cleaned_params_1, cleaned_params_0, output_file):
-        blocks_1 = self.get_blocks(cleaned_params_1)
-        blocks_0 = self.get_blocks(cleaned_params_0)
+    def generate_heatmaps(self, cleaned_params_1, cleaned_params_0, output_file, normalize=False):
+        blocks_1 = self.get_blocks(cleaned_params_1, normalize)
+        blocks_0 = self.get_blocks(cleaned_params_0, normalize)
 
         with PdfPages(output_file) as pdf:
             num_blocks_1 = blocks_1.shape[2]
@@ -75,13 +78,11 @@ class Transform:
             for i in range(num_blocks):
                 fig, axs = plt.subplots(1, 2, figsize=(10, 5))
                 if i < num_blocks_1:
-                    axs[0].imshow(blocks_1[:, :, i], cmap='hot', interpolation='nearest', aspect='auto')
+                    axs[0].imshow(blocks_1[:, :, i], cmap='hot', interpolation='nearest', aspect=10)
                     axs[0].set_title('Block {}'.format(i))
-                    axs[0].set_aspect(10.0)
                 if i < num_blocks_0:
-                    axs[1].imshow(blocks_0[:, :, i], cmap='hot', interpolation='nearest', aspect='auto')
+                    axs[1].imshow(blocks_0[:, :, i], cmap='hot', interpolation='nearest', aspect=10)
                     axs[1].set_title('Block {}'.format(i))
-                    axs[1].set_aspect(10.0)
                 pdf.savefig(fig)
                 plt.close()
 
