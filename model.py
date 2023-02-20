@@ -10,7 +10,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix, accuracy_score
 
 class Optimizer:
-    def __init__(self, data, params, freqs, iterations=3, shuffles=5):
+    def __init__(self, data, params, freqs, iterations=1, shuffles=5):
         #self.data = data #Array containing time series data about the total session
         self.params = np.array(params, dtype=int) #Array containing cleaned trial parameters
         self.shuffles = shuffles
