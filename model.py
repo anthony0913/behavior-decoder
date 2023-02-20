@@ -10,7 +10,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix, accuracy_score
 
 class Optimizer:
-    def __init__(self, data, params, freqs, iterations=3, shuffles=5):
+    def __init__(self, data, params, freqs, iterations=100, shuffles=5):
         #self.data = data #Array containing time series data about the total session
         self.params = np.array(params, dtype=int) #Array containing cleaned trial parameters
         self.shuffles = shuffles
@@ -169,7 +169,12 @@ class Batcher:
         #nevermind don't use hashmaps lol
 
     def get_statistics(self):
-        print("Complete with maximum accuracy as " + str(self.acc))
+        print("Complete with maximum accuracy as " + str(self.acc) + " using models:\n")
+        if self.archive.ndim != 1:
+            for model in self.archive:
+                print(model)
+        else:
+            print(self.archive)
 
 class Pooler:
     #Running multiple sessions in parallel
