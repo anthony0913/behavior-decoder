@@ -65,7 +65,7 @@ class Transform:
         return stacked_blocks
 
     def generate_heatmaps(self, cleaned_params_1, cleaned_params_0, output_file,
-                          normalize=True, threshold=True, inf=0.89, sup=0.9):
+                          normalize=True, threshold=True, inf=0.6, sup=8):
         blocks_1 = self.get_blocks(cleaned_params_1)
         blocks_0 = self.get_blocks(cleaned_params_0)
 
@@ -105,11 +105,11 @@ class Transform:
                 plt.close()
 
 
-clean = Clean('params.csv')
-transform = Transform('data.csv')
+clean = Clean('params2.csv')
+transform = Transform('data2.csv')
 
 cleaned_params_1 = clean.get_cleaned_params_1()
 cleaned_params_0 = clean.get_cleaned_params_0()
 
-output_file = 'heatmaps.pdf'
+output_file = 'heatmaps2.pdf'
 transform.generate_heatmaps(cleaned_params_1, cleaned_params_0, output_file)
