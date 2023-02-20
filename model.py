@@ -10,7 +10,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix, accuracy_score
 
 class Optimizer:
-    def __init__(self, data, params, freqs, iterations=1, shuffles=5):
+    def __init__(self, data, params, freqs, iterations=3, shuffles=5):
         #self.data = data #Array containing time series data about the total session
         self.params = np.array(params, dtype=int) #Array containing cleaned trial parameters
         self.shuffles = shuffles
@@ -29,10 +29,11 @@ class Optimizer:
         axis 2 - trial
         axis 1 - neuron
         '''
-        reduced_matrix = np.zeros((np.shape(data)[0],np.shape(data)[1],np.shape(params)[0]))
+        reduced_matrix = np.zeros((np.shape(self.freqs)[0],np.shape(data)[1],np.shape(params)[0]))
         for trial in range(np.shape(params)[0]):
+            #primitive is the corresponding block of session time series data
             primitive = data[int(params[trial,0]):int(params[trial,1]),:]
-            primitive = np.real(np.fft.fft(primitive, axis=0))
+            primitive = np.fft.rfft(primitive, axis=0).real
             reduced_matrix[:,:,trial] = primitive[self.freqs,:]
         #rescale before returning
         reduced_matrix = np.reshape(reduced_matrix, (np.shape(params)[0],-1))
@@ -85,7 +86,7 @@ class Optimizer:
             #Predictions and logging
             predicted_output = classifier.predict(testing_input)
             log[iteration, 0] = accuracy_score(testing_output, predicted_output)
-            print(accuracy_score(testing_output, predicted_output))
+            #print(accuracy_score(testing_output, predicted_output))
 
             interval = int(math.floor(100 / self.shuffles))
             for shuffles in range(self.shuffles):
@@ -131,12 +132,12 @@ class Batcher:
         log = np.zeros(length)
         self.acc = 0
 
-        for configuration in range(math.factorial(length)):
+        for configuration in range(2**length-1):
             stop = False
             index = 0
+            # binary counter
+            print(log)
             while not stop:
-                #binary counter
-                print(log[index])
                 if log[index]==0:
                     log[index]=1
                     stop=True
@@ -144,7 +145,7 @@ class Batcher:
                     log[index]=0
                 index+=1
             #Iterated updating of model archive
-            self.update_archive(Optimizer(data=self.data, params=self.cleaned_params, freqs=np.nonzero(log)))
+            self.update_archive(Optimizer(data=self.data, params=self.cleaned_params, freqs=np.nonzero(log)[0]))
 
     def continuous_iteration(self):
         #just do it with lower and upper freqs
@@ -168,7 +169,7 @@ class Batcher:
         #nevermind don't use hashmaps lol
 
     def get_statistics(self):
-        print("Complete with maximum accuracy as " + self.acc)
+        print("Complete with maximum accuracy as " + str(self.acc))
 
 class Pooler:
     #Running multiple sessions in parallel
