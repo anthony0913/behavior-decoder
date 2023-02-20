@@ -10,7 +10,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix, accuracy_score
 
 class Optimizer:
-    def __init__(self, data, params, freqs, iterations=100, shuffles=5):
+    def __init__(self, data, params, freqs, iterations=3, shuffles=5):
         #self.data = data #Array containing time series data about the total session
         self.params = np.array(params, dtype=int) #Array containing cleaned trial parameters
         self.shuffles = shuffles
@@ -23,9 +23,11 @@ class Optimizer:
     def gen_reduced_matrix(self, data, params):
         '''
         Generates a reduced matrix separating individual trials
+        flattened reduced matrix - change documentation here later
+
         axis 0 - time series -> frequency components
-        axis 1 - neuron
         axis 2 - trial
+        axis 1 - neuron
         '''
         reduced_matrix = np.zeros((np.shape(data)[0],np.shape(data)[1],np.shape(params)[0]))
         for trial in range(np.shape(params)[0]):
@@ -33,6 +35,7 @@ class Optimizer:
             primitive = np.real(np.fft.fft(primitive, axis=0))
             reduced_matrix[:,:,trial] = primitive[self.freqs,:]
         #rescale before returning
+        reduced_matrix = np.reshape(reduced_matrix, (np.shape(params)[0],-1))
         return reduced_matrix, params[:,2]
 
     def shuffle(self, params):
@@ -66,11 +69,11 @@ class Optimizer:
             #Generating necessary components for fitting and testing model
             reduced_trials, extra_trials = self.shuffle(self.params)
             primary_matrix, primary_output = self.gen_reduced_matrix(data, reduced_trials)
-            extra_matrix, extra_output =self.gen_reduced_matrix(data, extra_trials)
+            extra_matrix, extra_output = self.gen_reduced_matrix(data, extra_trials)
 
             #Creating the testing/training set split
             training_input, testing_input, training_output, testing_output = train_test_split(
-                primary_matrix, primary_output, test_size=0.25, stratify = [0,1] #50/50 split
+                primary_matrix, primary_output, test_size=0.25, stratify = primary_output #50/50 split
             )
             testing_input = np.vstack((testing_input, extra_matrix))
             testing_output = np.hstack((testing_output, extra_output))
@@ -82,6 +85,7 @@ class Optimizer:
             #Predictions and logging
             predicted_output = classifier.predict(testing_input)
             log[iteration, 0] = accuracy_score(testing_output, predicted_output)
+            print(accuracy_score(testing_output, predicted_output))
 
             interval = int(math.floor(100 / self.shuffles))
             for shuffles in range(self.shuffles):
@@ -89,7 +93,8 @@ class Optimizer:
                 correct_output = np.random.choice([0,1], size=np.shape(predicted_output)[0], p=[1-distribution, distribution])
                 log[iteration, shuffles+1] = accuracy_score(predicted_output, correct_output)
 
-            baseline = classifier.predict(np.random.rand(np.shape(testing_output)))
+            random_input = np.random.rand(np.shape(testing_input)[0],np.shape(testing_input)[1])
+            baseline = classifier.predict(random_input)
             half_output = np.random.choice([0,1], size=np.shape(predicted_output)[0], p=[0.5, 0.5])
             log[iteration, -1] = accuracy_score(baseline, half_output)
 
@@ -151,11 +156,11 @@ class Batcher:
         if new_acc > self.acc:
             #Remove previously archive and accuracy
             self.acc = new_acc
-            self.archive = new_config.config
+            self.archive = new_config.freqs
             self.stdevs = new_config.acc_stdev
         elif new_acc == self.acc:
             #Add current configuration to list of configurations corresponding to current accuracy
-            self.archive = np.append(self.archive, new_config.config, axis=0)
+            self.archive = np.append(self.archive, new_config.freqs, axis=0)
             self.stdevs = np.append(self.stdevs, new_config.acc_stdev)
         elif new_acc < self.acc:
             #Ignore current configuration
