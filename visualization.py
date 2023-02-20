@@ -65,7 +65,7 @@ class Transform:
         return stacked_blocks
 
     def generate_heatmaps(self, cleaned_params_1, cleaned_params_0, output_file,
-                          normalize=True):
+                          normalize=True, threshold=True, inf=0.89, sup=0.9):
         blocks_1 = self.get_blocks(cleaned_params_1)
         blocks_0 = self.get_blocks(cleaned_params_0)
 
@@ -76,6 +76,15 @@ class Transform:
             max_val = max(np.max(blocks_0),np.max(blocks_1))
             blocks_0 /= max_val
             blocks_1 /= max_val
+
+        print(np.max(blocks_0), np.max(blocks_1))
+
+        if threshold:
+            blocks_0[blocks_0 < inf] = 0
+            blocks_0[blocks_0 > sup] = 1
+
+            blocks_1[blocks_1 < inf] = 0
+            blocks_1[blocks_1 > sup] = 1
 
         with PdfPages(output_file) as pdf:
             num_blocks_1 = blocks_1.shape[2]
