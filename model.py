@@ -12,7 +12,7 @@ from sklearn.metrics import confusion_matrix, accuracy_score
 class Optimizer:
     def __init__(self, data, params, freqs, iterations=100, shuffles=5):
         #self.data = data #Array containing time series data about the total session
-        self.params = params #Array containing cleaned trial parameters
+        self.params = np.array(params, dtype=int) #Array containing cleaned trial parameters
         self.shuffles = shuffles
         self.freqs = freqs #current configuration of freqs accepted
         self.iterations = iterations
@@ -29,7 +29,7 @@ class Optimizer:
         '''
         reduced_matrix = np.zeros((np.shape(data)[0],np.shape(data)[1],np.shape(params)[0]))
         for trial in range(np.shape(params)[0]):
-            primitive = data[params[0],params[1],:]
+            primitive = data[int(params[trial,0]):int(params[trial,1]),:]
             primitive = np.real(np.fft.fft(primitive, axis=0))
             reduced_matrix[:,:,trial] = primitive[self.freqs,:]
         #rescale before returning
@@ -37,7 +37,6 @@ class Optimizer:
 
     def shuffle(self, params):
         #Split trials evenly wrt output type into reduced_trials, dump remaining trials into extra_trials
-        params = np.array(params, dtype=int)
         length = min(np.sum(self.params,axis=0)[2], np.shape(params)[0] - np.sum(self.params,axis=0)[2])
         np.random.shuffle(params)
         pos_out, neg_out = 0, 0
@@ -55,9 +54,7 @@ class Optimizer:
                     neg_out += 1
             else:
                 extra_trials = np.vstack((extra_trials, params[trial]))
-        print(np.shape(reduced_trials[1:]))
-        print(np.shape(extra_trials[1:]))
-        return np.array(reduced_trials[1:],dtype=int), np.array(extra_trials[1:],dtype=int)
+        return reduced_trials[1:], extra_trials[1:]
 
     def optimize(self, data):
         '''
