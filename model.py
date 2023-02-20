@@ -10,7 +10,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix, accuracy_score
 
 class Optimizer:
-    def __init__(self, data, params, freqs, iterations=3, shuffles=5):
+    def __init__(self, data, params, freqs, iterations=10, shuffles=5):
         #self.data = data #Array containing time series data about the total session
         self.params = np.array(params, dtype=int) #Array containing cleaned trial parameters
         self.shuffles = shuffles
@@ -33,7 +33,9 @@ class Optimizer:
         for trial in range(np.shape(params)[0]):
             #primitive is the corresponding block of session time series data
             primitive = data[int(params[trial,0]):int(params[trial,1]),:]
-            primitive = np.fft.rfft(primitive, axis=0).real
+            primitive = np.fft.rfft(primitive, axis=0).real[1:,:]
+            #print(self.freqs)
+            #print(primitive[self.freqs,:])
             reduced_matrix[:,:,trial] = primitive[self.freqs,:]
         #rescale before returning
         reduced_matrix = np.reshape(reduced_matrix, (np.shape(params)[0],-1))
@@ -81,6 +83,7 @@ class Optimizer:
 
             #SVD fit
             classifier = SVC(random_state=0, cache_size=7000, kernel="linear")
+
             classifier.fit(training_input, training_output)
 
             #Predictions and logging
@@ -103,8 +106,9 @@ class Optimizer:
 
 class Batcher:
     def __init__(self, data, params, constraints, length, output_classes,
-                 output_column=2, start_col=5, end_col=7):
+                 output_column=2, start_col=5, end_col=7, iterations=100):
         self.data = data
+        self.iterations = iterations
         self.constraints = constraints
         self.cleaned_params = self.clean_params(params, start_col, end_col,
                                                 output_column, output_classes, constraints=constraints)
@@ -132,7 +136,7 @@ class Batcher:
         log = np.zeros(length)
         self.acc = 0
 
-        for configuration in range(2**length-1):
+        for configuration in range(2**(length-1)-1):
             stop = False
             index = 0
             # binary counter
@@ -145,7 +149,8 @@ class Batcher:
                     log[index]=0
                 index+=1
             #Iterated updating of model archive
-            self.update_archive(Optimizer(data=self.data, params=self.cleaned_params, freqs=np.nonzero(log)[0]))
+            self.update_archive(Optimizer(data=self.data, params=self.cleaned_params, freqs=np.nonzero(log)[0],
+                                          iterations=self.iterations))
 
     def continuous_iteration(self):
         #just do it with lower and upper freqs
@@ -169,7 +174,12 @@ class Batcher:
         #nevermind don't use hashmaps lol
 
     def get_statistics(self):
-        print("Complete with maximum accuracy as " + str(self.acc))
+        print("Complete with maximum accuracy as " + str(self.acc) + " using models:\n")
+        if self.archive.ndim != 1:
+            for model in self.archive:
+                print(model)
+        else:
+            print(self.archive)
 
 class Pooler:
     #Running multiple sessions in parallel

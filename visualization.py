@@ -60,7 +60,7 @@ class Transform:
                         block = np.array(row[1:], dtype=float)
                         blocks.append(block)
         blocks_ft = np.fft.rfft(blocks, axis=0).real
-        trimmed_blocks = blocks_ft[:10, :]
+        trimmed_blocks = blocks_ft[1:10, :]
         stacked_blocks = np.stack([trimmed_blocks] * cleaned_params.shape[0], axis=2)
         if normalize:
             stacked_blocks -= stacked_blocks.min(axis=(0, 1), keepdims=True)
