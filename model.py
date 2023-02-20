@@ -37,6 +37,7 @@ class Optimizer:
 
     def shuffle(self, params):
         #Split trials evenly wrt output type into reduced_trials, dump remaining trials into extra_trials
+        params = np.array(params, dtype=int)
         length = min(np.sum(self.params,axis=0)[2], np.shape(params)[0] - np.sum(self.params,axis=0)[2])
         np.random.shuffle(params)
         pos_out, neg_out = 0, 0
@@ -44,15 +45,13 @@ class Optimizer:
         reduced_trials = np.zeros(np.shape(params[0]))
         extra_trials = np.zeros(np.shape(params[0]))
         extra_params = np.zeros(0)
-
         for trial in range(np.shape(params)[0]):
             if (params[trial,2]==1 and pos_out <= length) or \
                     (params[trial,2]==0 and neg_out <= length):
                 reduced_trials = np.vstack((reduced_trials, params[trial]))
-                print(pos_out, neg_out)
-                if [trial,2]==1:
+                if params[trial,2]==1:
                     pos_out += 1
-                if [trial,2]==0:
+                if params[trial,2]==0:
                     neg_out += 1
             else:
                 extra_trials = np.vstack((extra_trials, params[trial]))
