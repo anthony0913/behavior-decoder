@@ -6,3 +6,4 @@
 .idea/calcium-data.iml
 
 *.csv
+*.pyc

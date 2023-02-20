@@ -14,7 +14,7 @@ class Optimizer:
         #self.data = data #Array containing time series data about the total session
         self.params = params #Array containing cleaned trial parameters
         self.shuffles = shuffles
-        self.config = freqs
+        self.freqs = freqs #current configuration of freqs accepted
         self.iterations = iterations
 
         #Model evaluation
@@ -41,16 +41,21 @@ class Optimizer:
         np.random.shuffle(params)
         pos_out, neg_out = 0, 0
 
-        reduced_trials = np.zeros(0)
+        reduced_trials = np.zeros(np.shape(params[0]))
+        extra_trials = np.zeros(np.shape(params[0]))
         extra_params = np.zeros(0)
 
         for trial in range(np.shape(params)[0]):
             if (params[trial,2]==1 and pos_out <= length) or \
                     params[trial,2]==0 and neg_out <= length:
-                reduced_trials = np.append(reduced_trials, params[trial], axis=0)
+                reduced_trials = np.vstack((reduced_trials, params[trial]))
+                if [trial,2]==1: pos_out += 1
+                if [trial,2]==0: neg_out += 1
             else:
-                extra_trials = np.append(extra_trials, params[trial], axis=0)
-        return reduced_trials, extra_trials
+                extra_trials = np.vstack((extra_trials, params[trial]))
+        print(np.array(reduced_trials[1:],dtype=int))
+        print(np.array(extra_trials[1:],dtype=int))
+        return np.array(reduced_trials[1:],dtype=int), np.array(extra_trials[1:],dtype=int)
 
     def optimize(self, data):
         '''
