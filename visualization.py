@@ -49,24 +49,23 @@ class Transform:
         self.blocks_0 = None
 
     def get_blocks(self, cleaned_params):
-        blocks = []
-        with open(self.session_file, 'r') as session_csv:
-            session_reader = csv.reader(session_csv)
-            next(session_reader)
-            for row in session_reader:
-                session_col = int(row[0])
-                for cleaned_row in cleaned_params:
-                    if session_col >= cleaned_row[1] and session_col <= cleaned_row[2]:
-                        block = np.array(row[1:], dtype=float)
-                        blocks.append(block)
-        print(np.shape(blocks))
-        blocks_ft = np.fft.rfft(blocks, axis=0).real
-        trimmed_blocks = blocks_ft[1:10, :]
+        with open('data.csv', 'r') as csvfile:
+            reader = csv.reader(csvfile)
+            next(reader)
+            rows = [row for row in reader]
+        data = np.array(rows, dtype=float)
+        blocks = np.zeros(np.shape(data)[1]-1)
+        for cleaned_row in cleaned_params:
+            block = data[cleaned_row[1]:cleaned_row[2],1:]
+            blocks = np.vstack((blocks, np.fft.rfft(block, axis=0).real))
+        blocks = blocks[1:,:]
+        #print(np.shape(blocks))
+        trimmed_blocks = blocks[1:10, :]
         stacked_blocks = np.stack([trimmed_blocks] * cleaned_params.shape[0], axis=2)
         return stacked_blocks
 
     def generate_heatmaps(self, cleaned_params_1, cleaned_params_0, output_file,
-                          normalize=True, threshold=True, inf=0.4, sup=1):
+                          normalize=False, threshold=False, inf=0.4, sup=1):
         blocks_1 = self.get_blocks(cleaned_params_1)
         blocks_0 = self.get_blocks(cleaned_params_0)
 
