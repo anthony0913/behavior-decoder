@@ -59,15 +59,18 @@ class Transform:
                     if session_col >= cleaned_row[1] and session_col <= cleaned_row[2]:
                         block = np.array(row[1:], dtype=float)
                         blocks.append(block)
+        print(np.shape(blocks))
         blocks_ft = np.fft.rfft(blocks, axis=0).real
         trimmed_blocks = blocks_ft[1:10, :]
         stacked_blocks = np.stack([trimmed_blocks] * cleaned_params.shape[0], axis=2)
         return stacked_blocks
 
     def generate_heatmaps(self, cleaned_params_1, cleaned_params_0, output_file,
-                          normalize=True, threshold=True, inf=0.6, sup=8):
+                          normalize=True, threshold=True, inf=0.4, sup=1):
         blocks_1 = self.get_blocks(cleaned_params_1)
         blocks_0 = self.get_blocks(cleaned_params_0)
+
+        print(np.max(np.std(blocks_0, axis=2)), np.max(np.std(blocks_1, axis=2)))
 
         if normalize:
             min_val = min(np.min(blocks_0),np.min(blocks_1))
@@ -85,6 +88,8 @@ class Transform:
 
             blocks_1[blocks_1 < inf] = 0
             blocks_1[blocks_1 > sup] = 1
+
+        print(np.max(np.std(blocks_0,axis=2)),np.max(np.std(blocks_1,axis=2)))
 
         with PdfPages(output_file) as pdf:
             num_blocks_1 = blocks_1.shape[2]
@@ -105,11 +110,11 @@ class Transform:
                 plt.close()
 
 
-clean = Clean('params2.csv')
-transform = Transform('data2.csv')
+clean = Clean('params.csv')
+transform = Transform('data.csv')
 
 cleaned_params_1 = clean.get_cleaned_params_1()
 cleaned_params_0 = clean.get_cleaned_params_0()
 
-output_file = 'heatmaps2.pdf'
+output_file = 'heatmaps.pdf'
 transform.generate_heatmaps(cleaned_params_1, cleaned_params_0, output_file)
