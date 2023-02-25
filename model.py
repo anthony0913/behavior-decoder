@@ -58,7 +58,8 @@ class Optimizer:
                     neg_out += 1
             else:
                 extra_trials = np.vstack((extra_trials, params[trial]))
-        return reduced_trials[1:], extra_trials[1:]
+            midpoint = (len(extra_trials)-1)//2
+        return reduced_trials[1:], extra_trials[1:midpoint], extra_trials[:midpoint]
 
     def optimize(self, data):
         '''
@@ -68,9 +69,9 @@ class Optimizer:
         log = np.zeros((self.iterations, 1+self.shuffles))
         for iteration in range(self.iterations):
             #Generating necessary components for fitting and testing model
-            reduced_trials, extra_trials = self.shuffle(self.params)
+            reduced_trials, extended_trials, evaluation_trials = self.shuffle(self.params)
             primary_matrix, primary_output = self.gen_reduced_matrix(data, reduced_trials)
-            extra_matrix, extra_output = self.gen_reduced_matrix(data, extra_trials)
+            extra_matrix, extra_output = self.gen_reduced_matrix(data, extended_trials)
 
             #Creating the testing/training set split
             training_input, testing_input, training_output, testing_output = train_test_split(
