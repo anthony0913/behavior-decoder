@@ -1,13 +1,13 @@
 import numpy as np
-import matplotlib.pyplot as plt
-import math
+#import matplotlib.pyplot as plt
+#import math
 import csv
 
-from sklearn.cluster import AffinityPropagation, SpectralClustering, KMeans
+#from sklearn.cluster import AffinityPropagation, SpectralClustering, KMeans
 from sklearn.svm import SVC
-from sklearn.preprocessing import StandardScaler, MinMaxScaler
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import confusion_matrix, accuracy_score
+#from sklearn.preprocessing import StandardScaler, MinMaxScaler
+#from sklearn.model_selection import train_test_split
+#from sklearn.metrics import confusion_matrix, accuracy_score
 from sklearn.model_selection import StratifiedKFold, cross_val_score
 from sklearn.utils import shuffle
 from collections import defaultdict
@@ -15,9 +15,12 @@ from tqdm import tqdm
 
 
 class Optimizer:
-    def __init__(self, freqs, iterations=100):
+    def __init__(self, data, params, freqs, iterations=100):
         self.freqs = freqs  # current configuration of freqs accepted
         self.iterations = iterations
+        self.train_mat, self.train_out = self.gen_reduced_matrix(data, params)
+        print(self.train_out)
+        self.optimize()
 
     def gen_reduced_matrix(self, data, params):
         '''
@@ -38,58 +41,18 @@ class Optimizer:
         reduced_matrix = np.reshape(reduced_matrix, (np.shape(params)[0],-1))
         return reduced_matrix, params[:,2]
 
-    def split(self, params):
-        # Randomly shuffle the input params array.
-        np.random.shuffle(params)
-
-        # Separate the positive and negative output trials in the shuffled params array into two separate arrays.
-        pos_trials = params[params[:, 2] == 1]
-        neg_trials = params[params[:, 2] == 0]
-
-        # Compute the difference between the number of positive and negative output trials.
-        diff = len(pos_trials) - len(neg_trials)
-
-        # If the difference is positive, select the first half of the excess positive output trials to be set aside as evaluation trials.
-        # If the difference is negative, select the first half of the excess negative output trials to be set aside as evaluation trials.
-        if diff > 0:
-            eval_pos_trials = pos_trials[:diff // 2]
-            eval_neg_trials = np.zeros_like(eval_pos_trials)
-        elif diff < 0:
-            eval_neg_trials = neg_trials[-diff // 2:]
-            eval_pos_trials = np.zeros_like(eval_neg_trials)
-        else:
-            eval_pos_trials = np.zeros_like(pos_trials)
-            eval_neg_trials = np.zeros_like(neg_trials)
-
-        # Concatenate the remaining positive and negative output trials into a `training_trials` array.
-        training_trials = np.concatenate([pos_trials[diff // 2:], neg_trials[diff // 2:]])
-
-        # Return `training_trials` and `evaluation_trials`.
-        return training_trials, np.concatenate([eval_pos_trials, eval_neg_trials])
-
-    def optimize(self, training_matrix, training_output, eval_matrix, eval_output):
+    def optimize(self):
         # Cross-validation with StratifiedKFold
         skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=0)
-        best_model, best_acc = None, 0
         accs = []
-        for freqs in skf.split(training_matrix, training_output):
+        for freqs in skf.split(self.train_mat, self.train_out):
             freqs = self.freqs[freqs[1]]
             classifier = SVC(random_state=0, cache_size=7000, kernel="linear")
-            acc = np.mean(cross_val_score(classifier, training_matrix[:, freqs], training_output, cv=skf, n_jobs=-1))
+            acc = np.mean(cross_val_score(classifier, self.train_mat[:, freqs], self.train_out, cv=skf, n_jobs=-1))
             accs.append(acc)
-            if acc > best_acc:
-                best_acc = acc
-                best_model = classifier.set_params(**{'kernel': 'linear', 'C': 1, 'gamma': 'scale'})
-
-        # Use the best model to predict the output for the evaluation trials
-        predicted_output = best_model.predict(eval_matrix)
-
-        # Calculate the mean accuracy and standard deviation of the SVM classifier evaluated on the evaluation set.
-        mean_acc = np.mean(accuracy_score(eval_output, predicted_output))
-        stdev_acc = np.std(accuracy_score(eval_output, predicted_output))
-
-        # Return the mean accuracy and standard deviation of the SVM classifier evaluated on the evaluation set.
-        return mean_acc, stdev_acc
+        # Calculate the mean and standard deviation of the SVM classifier evaluated on the test set.
+        self.acc_mean = np.mean(accs)
+        self.acc_stdev = np.std(accs)
 
 class Batcher:
     def __init__(self, data, params, constraints, length, output_classes,
@@ -101,6 +64,8 @@ class Batcher:
 
         # Split the cleaned params array into training and evaluation sets.
         self.training_trials, self.eval_trials = self.split(self.cleaned_params)
+        print(self.training_trials)
+        print(self.eval_trials)
 
         self.power_iteration(length)
         self.get_statistics()
@@ -169,9 +134,9 @@ class Batcher:
                 index+=1
 
             # Call the `optimize` method of the `Optimizer` class on the training and evaluation sets for each iteration.
-            #optimizer = Optimizer(data=self.data, params=self.training_trials, freqs=np.nonzero(log)[0], iterations=100, shuffles=5)
-            optimizer = Optimizer(freqs=np.nonzero(log)[0], iterations=100)
-            mean_acc = optimizer.best_acc
+            optimizer = Optimizer(data=self.data, params=self.training_trials, freqs=np.nonzero(log)[0], iterations=100)#, shuffles=5)
+            #optimizer = Optimizer(freqs=np.nonzero(log)[0], iterations=100)
+            mean_acc = optimizer.acc_mean
 
             # Update the record of configurations and corresponding accuracy.
             self.archive[mean_acc].append(np.nonzero(log)[0])
@@ -216,7 +181,7 @@ class Batcher:
         best_models = []
         for freqs in self.archive[self.acc]:
             optimizer = Optimizer(data=self.data, params=self.training_trials, freqs=freqs, iterations=100, shuffles=5)
-            mean_acc = optimizer.best_acc
+            mean_acc = optimizer.acc_mean
             stdev_acc = np.std([optimizer.optimize()[1] for i in range(10)])
 
             best_models.append((freqs, mean_acc, stdev_acc))
