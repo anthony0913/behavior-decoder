@@ -61,6 +61,35 @@ class Optimizer:
             midpoint = (len(extra_trials)-1)//2
         return reduced_trials[1:], extra_trials[1:midpoint], extra_trials[:midpoint]
 
+    def split(self, params):
+        # Randomly shuffle the input params array.
+        np.random.shuffle(params)
+
+        # Separate the positive and negative output trials in the shuffled params array into two separate arrays.
+        pos_trials = params[params[:, 2] == 1]
+        neg_trials = params[params[:, 2] == 0]
+
+        # Compute the difference between the number of positive and negative output trials.
+        diff = len(pos_trials) - len(neg_trials)
+
+        # If the difference is positive, select the first half of the excess positive output trials to be set aside as evaluation trials.
+        # If the difference is negative, select the first half of the excess negative output trials to be set aside as evaluation trials.
+        if diff > 0:
+            eval_pos_trials = pos_trials[:diff // 2]
+            eval_neg_trials = neg_trials[:diff // 2]
+        elif diff < 0:
+            eval_pos_trials = pos_trials[-diff // 2:]
+            eval_neg_trials = neg_trials[-diff // 2:]
+        else:
+            eval_pos_trials = np.zeros_like(pos_trials)
+            eval_neg_trials = np.zeros_like(neg_trials)
+
+        # Concatenate the remaining positive and negative output trials into a `training_trials` array.
+        training_trials = np.concatenate([pos_trials[diff // 2:], neg_trials[diff // 2:]])
+
+        # Return `training_trials` and `evaluation_trials`.
+        return training_trials, np.concatenate([eval_pos_trials, eval_neg_trials])
+
     def optimize(self, data):
         '''
         Logging format
