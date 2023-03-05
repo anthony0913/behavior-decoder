@@ -19,7 +19,6 @@ class Optimizer:
         self.freqs = freqs  # current configuration of freqs accepted
         self.iterations = iterations
         self.train_mat, self.train_out = self.gen_reduced_matrix(data, params)
-        print(self.train_out)
         self.optimize()
 
     def gen_reduced_matrix(self, data, params):
@@ -46,9 +45,9 @@ class Optimizer:
         skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=0)
         accs = []
         for freqs in skf.split(self.train_mat, self.train_out):
-            freqs = self.freqs[freqs[1]]
+            #freqs = self.freqs[freqs[1]]
             classifier = SVC(random_state=0, cache_size=7000, kernel="linear")
-            acc = np.mean(cross_val_score(classifier, self.train_mat[:, freqs], self.train_out, cv=skf, n_jobs=-1))
+            acc = np.mean(cross_val_score(classifier, self.train_mat[:, self.freqs], self.train_out, cv=skf, n_jobs=-1))
             accs.append(acc)
         # Calculate the mean and standard deviation of the SVM classifier evaluated on the test set.
         self.acc_mean = np.mean(accs)
@@ -60,12 +59,10 @@ class Batcher:
         self.data = data
         self.constraints = constraints
         self.cleaned_params = self.clean_params(params, start_col, end_col,
-                                                output_column, output_classes, constraints=constraints)
+                                                output_column, output_classes, constraints=constraints).astype(int)
 
         # Split the cleaned params array into training and evaluation sets.
         self.training_trials, self.eval_trials = self.split(self.cleaned_params)
-        print(self.training_trials)
-        print(self.eval_trials)
 
         self.power_iteration(length)
         self.get_statistics()
@@ -96,23 +93,20 @@ class Batcher:
         # Compute the difference between the number of positive and negative output trials.
         diff = len(pos_trials) - len(neg_trials)
 
-        # If the difference is positive, select the first half of the excess positive output trials to be set aside as evaluation trials.
-        # If the difference is negative, select the first half of the excess negative output trials to be set aside as evaluation trials.
+        # If the difference is positive, select the second half of the excess positive output trials to be set aside as evaluation trials.
+        # If the difference is negative, select the second half of the excess negative output trials to be set aside as evaluation trials.
         if diff > 0:
-            eval_pos_trials = pos_trials[:diff // 2]
-            eval_neg_trials = np.zeros_like(eval_pos_trials)
+            eval_trials = pos_trials[abs(diff) // 2:]
         elif diff < 0:
-            eval_neg_trials = neg_trials[-diff // 2:]
-            eval_pos_trials = np.zeros_like(eval_neg_trials)
+            eval_trials = neg_trials[abs(diff) // 2:]
         else:
-            eval_pos_trials = np.zeros_like(pos_trials)
-            eval_neg_trials = np.zeros_like(neg_trials)
+            print("Error: Please perform train test split manually")
 
         # Concatenate the remaining positive and negative output trials into a `training_trials` array.
-        training_trials = np.concatenate([pos_trials[diff // 2:], neg_trials[diff // 2:]])
+        training_trials = np.concatenate([pos_trials[:abs(diff) // 2], neg_trials[:abs(diff) // 2]])
 
         # Return `training_trials` and `evaluation_trials`.
-        return training_trials, np.concatenate([eval_pos_trials, eval_neg_trials])
+        return training_trials, eval_trials
 
 
     def power_iteration(self, length):
@@ -134,6 +128,7 @@ class Batcher:
                 index+=1
 
             # Call the `optimize` method of the `Optimizer` class on the training and evaluation sets for each iteration.
+            print(self.training_trials)
             optimizer = Optimizer(data=self.data, params=self.training_trials, freqs=np.nonzero(log)[0], iterations=100)#, shuffles=5)
             #optimizer = Optimizer(freqs=np.nonzero(log)[0], iterations=100)
             mean_acc = optimizer.acc_mean
