@@ -34,7 +34,9 @@ class Optimizer:
         for trial in range(np.shape(params)[0]):
             #primitive is the corresponding block of session time series data
             primitive = data[int(params[trial,0]):int(params[trial,1]),:]
-            primitive = np.fft.rfft(primitive, axis=0).real
+            primitive = np.fft.rfft(primitive, axis=0).real[1:,:]
+            #print(self.freqs)
+            #print(primitive[self.freqs,:])
             reduced_matrix[:,:,trial] = primitive[self.freqs,:]
         #rescale before returning
         reduced_matrix = np.reshape(reduced_matrix, (np.shape(params)[0],-1))
@@ -84,8 +86,9 @@ class Optimizer:
 
 class Batcher:
     def __init__(self, data, params, constraints, length, output_classes,
-                 output_column=2, start_col=5, end_col=7):
+                 output_column=2, start_col=5, end_col=7, iterations=100):
         self.data = data
+        self.iterations = iterations
         self.constraints = constraints
         self.cleaned_params = self.clean_params(params, start_col, end_col,
                                                 output_column, output_classes, constraints=constraints).astype(int)
