@@ -6,7 +6,7 @@ import csv
 #from sklearn.cluster import AffinityPropagation, SpectralClustering, KMeans
 from sklearn.svm import SVC
 #from sklearn.preprocessing import StandardScaler, MinMaxScaler
-#from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split
 #from sklearn.metrics import confusion_matrix, accuracy_score
 from sklearn.model_selection import StratifiedKFold, cross_val_score
 from sklearn.utils import shuffle
@@ -15,7 +15,7 @@ from tqdm import tqdm
 
 
 class Optimizer:
-    def __init__(self, data, params, freqs, iterations=100):
+    def __init__(self, data, params, freqs, iterations=10):
         self.freqs = freqs  # current configuration of freqs accepted
         self.iterations = iterations
         self.train_mat, self.train_out = self.gen_reduced_matrix(data, params)
@@ -41,6 +41,34 @@ class Optimizer:
         return reduced_matrix, params[:,2]
 
     def optimize(self):
+        pos_trials = self.train_mat[self.train_out == 1]
+        neg_trials = self.train_mat[self.train_out == 0]
+        if len(pos_trials) > len(neg_trials):
+            pos_trials, pos_val = train_test_split(pos_trials, test_size=len(pos_trials) - len(neg_trials),
+                                                   stratify=self.train_out[self.train_out == 1])
+            val_data = pos_val
+            val_labels = np.ones(len(val_data))
+        else:
+            neg_trials, neg_val = train_test_split(neg_trials, test_size=len(neg_trials) - len(pos_trials),
+                                                   stratify=self.train_out[self.train_out == 0])
+            val_data = neg_val
+            val_labels = np.zeros(len(val_data))
+        train_data = np.concatenate([pos_trials, neg_trials])
+        train_labels = np.concatenate([np.ones(len(pos_trials)), np.zeros(len(neg_trials))])
+
+        # Cross-validation with StratifiedKFold
+        skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=0)
+        accs = []
+        for train_index, test_index in skf.split(train_data, train_labels):
+            classifier = SVC(random_state=0, cache_size=7000, kernel="linear")
+            classifier.fit(train_data[train_index][:, self.freqs], train_labels[train_index])
+            acc = classifier.score(val_data[:, self.freqs], val_labels)
+            accs.append(acc)
+        # Calculate the mean and standard deviation of the SVM classifier evaluated on the test set.
+        self.acc_mean = np.mean(accs)
+        self.acc_stdev = np.std(accs)
+    '''
+    def optimize(self):
         # Cross-validation with StratifiedKFold
         skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=0)
         accs = []
@@ -48,17 +76,11 @@ class Optimizer:
             classifier = SVC(random_state=0, cache_size=7000, kernel="linear")
             acc = np.mean(cross_val_score(classifier, self.train_mat[:, self.freqs], self.train_out, cv=skf, n_jobs=-1))
             accs.append(acc)
-        '''
-        for freqs in skf.split(self.train_mat, self.train_out):
-            #freqs = self.freqs[freqs[1]]
-            classifier = SVC(random_state=0, cache_size=7000, kernel="linear")
-            acc = np.mean(cross_val_score(classifier, self.train_mat[:, self.freqs], self.train_out, cv=skf, n_jobs=-1))
-            accs.append(acc)
-        '''
 
         # Calculate the mean and standard deviation of the SVM classifier evaluated on the test set.
         self.acc_mean = np.mean(accs)
         self.acc_stdev = np.std(accs)
+    '''
 
 class Batcher:
     def __init__(self, data, params, constraints, length, output_classes,
@@ -135,14 +157,14 @@ class Batcher:
                 index+=1
 
             # Call the `optimize` method of the `Optimizer` class on the training and evaluation sets for each iteration.
-            print(self.training_trials)
-            optimizer = Optimizer(data=self.data, params=self.training_trials, freqs=np.nonzero(log)[0], iterations=100)#, shuffles=5)
+            optimizer = Optimizer(data=self.data, params=self.training_trials, freqs=np.nonzero(log)[0])#, shuffles=5)
             mean_acc = optimizer.acc_mean
 
             # Update the record of configurations and corresponding accuracy.
             self.archive[mean_acc].append(np.nonzero(log)[0])
             if mean_acc > self.acc:
                 self.acc = mean_acc
+                print(mean_acc, np.nonzero(log)[0])
 
             # Iterate through each mean accuracy in descending order.
             for acc in sorted(self.archive.keys(), reverse=True):
