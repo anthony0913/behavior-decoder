@@ -79,10 +79,6 @@ class Batcher:
         self.constraints = constraints
         self.cleaned_params = self.clean_params(params, start_col, end_col,
                                                 output_column, output_classes, constraints=constraints).astype(int)
-
-        # Split the cleaned params array into training and evaluation sets.
-        self.training_trials, self.eval_trials = self.split(self.cleaned_params)
-
         self.evaluate(resamples)
 
     def clean_params(self, params, start_col, end_col, output_column, output_classes, constraints=None):
@@ -114,24 +110,27 @@ class Batcher:
         # If the difference is positive, select the second half of the excess positive output trials to be set aside as evaluation trials.
         # If the difference is negative, select the second half of the excess negative output trials to be set aside as evaluation trials.
         if diff > 0:
-            eval_trials = pos_trials[abs(diff) // 2:]
+            eval_trials = pos_trials[:abs(diff) // 4]
         elif diff < 0:
-            eval_trials = neg_trials[abs(diff) // 2:]
+            eval_trials = neg_trials[:abs(diff) // 4]
         else:
             print("Error: Please perform train test split manually")
 
         # Concatenate the remaining positive and negative output trials into a `training_trials` array.
-        training_trials = np.concatenate([pos_trials[:abs(diff) // 2], neg_trials[:abs(diff) // 2]])
+        training_trials = np.concatenate([pos_trials[abs(diff) // 4:], neg_trials[abs(diff) // 4:]])
 
         # Return `training_trials` and `evaluation_trials`.
         return training_trials, eval_trials
 
     def evaluate(self, resamples):
         best_models = np.zeros((resamples, self.length))
-        statistics = np.zeros((2, resamples))
+        statistics = np.zeros((resamples, 2))
         for resample in range(resamples):
-            print("On resample " + str(resample))
-            best_models[resample, :], statistics[resample, :] = self.power_iteration()
+            self.training_trials, self.eval_trials = self.split(self.cleaned_params)
+            print("On resample: " + str(resample))
+            output = self.power_iteration()
+            best_models[resample, :] = output[0]
+            statistics[resample, :] = output[1]
         print(best_models)
         print(statistics)
 
@@ -177,8 +176,8 @@ class Batcher:
 
             # Remove the configurations that did not result in the current maximum accuracy.
             del archive[acc]
-            self.get_statistics(best_acc, archive)
-            return log, [best_acc, best_stdev]
+        self.get_statistics(best_acc, archive)
+        return log, [best_acc, best_stdev]
 
     def continuous_iteration(self):
         #just do it with lower and upper freqs
