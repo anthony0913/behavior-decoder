@@ -75,7 +75,7 @@ class Optimizer:
 
             #Creating the testing/training set split
             training_input, testing_input, training_output, testing_output = train_test_split(
-                primary_matrix, primary_output, test_size=0.25, stratify = primary_output #50/50 split
+                primary_matrix, primary_output, test_size=0.15, stratify = primary_output #50/50 split
             )
             testing_input = np.vstack((testing_input, extra_matrix))
             testing_output = np.hstack((testing_output, extra_output))
