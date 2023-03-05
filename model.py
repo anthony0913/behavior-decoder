@@ -76,10 +76,10 @@ class Optimizer:
         # If the difference is negative, select the first half of the excess negative output trials to be set aside as evaluation trials.
         if diff > 0:
             eval_pos_trials = pos_trials[:diff // 2]
-            eval_neg_trials = neg_trials[:diff // 2]
+            eval_neg_trials = np.zeros_like(eval_pos_trials)
         elif diff < 0:
-            eval_pos_trials = pos_trials[-diff // 2:]
             eval_neg_trials = neg_trials[-diff // 2:]
+            eval_pos_trials = np.zeros_like(eval_neg_trials)
         else:
             eval_pos_trials = np.zeros_like(pos_trials)
             eval_neg_trials = np.zeros_like(neg_trials)
