@@ -44,11 +44,18 @@ class Optimizer:
         # Cross-validation with StratifiedKFold
         skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=0)
         accs = []
+        for iteration in self.iterations:
+            classifier = SVC(random_state=0, cache_size=7000, kernel="linear")
+            acc = np.mean(cross_val_score(classifier, self.train_mat[:, self.freqs], self.train_out, cv=skf, n_jobs=-1))
+            accs.append(acc)
+        '''
         for freqs in skf.split(self.train_mat, self.train_out):
             #freqs = self.freqs[freqs[1]]
             classifier = SVC(random_state=0, cache_size=7000, kernel="linear")
             acc = np.mean(cross_val_score(classifier, self.train_mat[:, self.freqs], self.train_out, cv=skf, n_jobs=-1))
             accs.append(acc)
+        '''
+
         # Calculate the mean and standard deviation of the SVM classifier evaluated on the test set.
         self.acc_mean = np.mean(accs)
         self.acc_stdev = np.std(accs)
@@ -130,7 +137,6 @@ class Batcher:
             # Call the `optimize` method of the `Optimizer` class on the training and evaluation sets for each iteration.
             print(self.training_trials)
             optimizer = Optimizer(data=self.data, params=self.training_trials, freqs=np.nonzero(log)[0], iterations=100)#, shuffles=5)
-            #optimizer = Optimizer(freqs=np.nonzero(log)[0], iterations=100)
             mean_acc = optimizer.acc_mean
 
             # Update the record of configurations and corresponding accuracy.
