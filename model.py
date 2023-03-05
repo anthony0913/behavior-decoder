@@ -8,17 +8,16 @@ from sklearn.svm import SVC
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix, accuracy_score
+from sklearn.model_selection import StratifiedKFold, cross_val_score
+from sklearn.utils import shuffle
+from collections import defaultdict
+from tqdm import tqdm
+
 
 class Optimizer:
-    def __init__(self, data, params, freqs, iterations=100, shuffles=5):
-        #self.data = data #Array containing time series data about the total session
-        self.params = np.array(params, dtype=int) #Array containing cleaned trial parameters
-        self.shuffles = shuffles
-        self.freqs = freqs #current configuration of freqs accepted
+    def __init__(self, freqs, iterations=100):
+        self.freqs = freqs  # current configuration of freqs accepted
         self.iterations = iterations
-
-        #Model evaluation
-        self.acc_mean, self.acc_stdev = self.optimize(data)
 
     def gen_reduced_matrix(self, data, params):
         '''
@@ -38,28 +37,6 @@ class Optimizer:
         #rescale before returning
         reduced_matrix = np.reshape(reduced_matrix, (np.shape(params)[0],-1))
         return reduced_matrix, params[:,2]
-
-    def shuffle(self, params):
-        #Split trials evenly wrt output type into reduced_trials, dump remaining trials into extra_trials
-        length = min(np.sum(self.params,axis=0)[2], np.shape(params)[0] - np.sum(self.params,axis=0)[2])
-        np.random.shuffle(params)
-        pos_out, neg_out = 0, 0
-
-        reduced_trials = np.zeros(np.shape(params[0]))
-        extra_trials = np.zeros(np.shape(params[0]))
-        extra_params = np.zeros(0)
-        for trial in range(np.shape(params)[0]):
-            if (params[trial,2]==1 and pos_out <= length) or \
-                    (params[trial,2]==0 and neg_out <= length):
-                reduced_trials = np.vstack((reduced_trials, params[trial]))
-                if params[trial,2]==1:
-                    pos_out += 1
-                if params[trial,2]==0:
-                    neg_out += 1
-            else:
-                extra_trials = np.vstack((extra_trials, params[trial]))
-            midpoint = (len(extra_trials)-1)//2
-        return reduced_trials[1:], extra_trials[1:midpoint], extra_trials[:midpoint]
 
     def split(self, params):
         # Randomly shuffle the input params array.
@@ -90,46 +67,29 @@ class Optimizer:
         # Return `training_trials` and `evaluation_trials`.
         return training_trials, np.concatenate([eval_pos_trials, eval_neg_trials])
 
-    def optimize(self, data):
-        '''
-        Logging format
-        Accuracy | Noise control
-        '''
-        log = np.zeros((self.iterations, 1+self.shuffles))
-        for iteration in range(self.iterations):
-            #Generating necessary components for fitting and testing model
-            reduced_trials, extended_trials, evaluation_trials = self.shuffle(self.params)
-            primary_matrix, primary_output = self.gen_reduced_matrix(data, reduced_trials)
-            extra_matrix, extra_output = self.gen_reduced_matrix(data, extended_trials)
-
-            #Creating the testing/training set split
-            training_input, testing_input, training_output, testing_output = train_test_split(
-                primary_matrix, primary_output, test_size=0.15, stratify = primary_output #50/50 split
-            )
-            testing_input = np.vstack((testing_input, extra_matrix))
-            testing_output = np.hstack((testing_output, extra_output))
-
-            #SVD fit
+    def optimize(self, training_matrix, training_output, eval_matrix, eval_output):
+        # Cross-validation with StratifiedKFold
+        skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=0)
+        best_model, best_acc = None, 0
+        accs = []
+        for freqs in skf.split(training_matrix, training_output):
+            freqs = self.freqs[freqs[1]]
             classifier = SVC(random_state=0, cache_size=7000, kernel="linear")
-            classifier.fit(training_input, training_output)
+            acc = np.mean(cross_val_score(classifier, training_matrix[:, freqs], training_output, cv=skf, n_jobs=-1))
+            accs.append(acc)
+            if acc > best_acc:
+                best_acc = acc
+                best_model = classifier.set_params(**{'kernel': 'linear', 'C': 1, 'gamma': 'scale'})
 
-            #Predictions and logging
-            predicted_output = classifier.predict(testing_input)
-            log[iteration, 0] = accuracy_score(testing_output, predicted_output)
-            #print(accuracy_score(testing_output, predicted_output))
+        # Use the best model to predict the output for the evaluation trials
+        predicted_output = best_model.predict(eval_matrix)
 
-            interval = int(math.floor(100 / self.shuffles))
-            for shuffles in range(self.shuffles):
-                distribution = shuffles / self.shuffles
-                correct_output = np.random.choice([0,1], size=np.shape(predicted_output)[0], p=[1-distribution, distribution])
-                log[iteration, shuffles+1] = accuracy_score(predicted_output, correct_output)
+        # Calculate the mean accuracy and standard deviation of the SVM classifier evaluated on the evaluation set.
+        mean_acc = np.mean(accuracy_score(eval_output, predicted_output))
+        stdev_acc = np.std(accuracy_score(eval_output, predicted_output))
 
-            random_input = np.random.rand(np.shape(testing_input)[0],np.shape(testing_input)[1])
-            baseline = classifier.predict(random_input)
-            half_output = np.random.choice([0,1], size=np.shape(predicted_output)[0], p=[0.5, 0.5])
-            log[iteration, -1] = accuracy_score(baseline, half_output)
-
-        return np.mean(log), np.std(log)
+        # Return the mean accuracy and standard deviation of the SVM classifier evaluated on the evaluation set.
+        return mean_acc, stdev_acc
 
 class Batcher:
     def __init__(self, data, params, constraints, length, output_classes,
@@ -138,6 +98,9 @@ class Batcher:
         self.constraints = constraints
         self.cleaned_params = self.clean_params(params, start_col, end_col,
                                                 output_column, output_classes, constraints=constraints)
+
+        # Split the cleaned params array into training and evaluation sets.
+        self.training_trials, self.eval_trials = self.split(self.cleaned_params)
 
         self.power_iteration(length)
         self.get_statistics()
@@ -157,16 +120,46 @@ class Batcher:
             output[trial, -1] = output_classes[output[trial, -1]]#converts output from an object to a numerical value
         return output[1:,:]
 
+    def split(self, params):
+        # Randomly shuffle the input params array.
+        params = shuffle(params)
+
+        # Separate the positive and negative output trials in the shuffled params array into two separate arrays.
+        pos_trials = params[params[:, 2] == 1]
+        neg_trials = params[params[:, 2] == 0]
+
+        # Compute the difference between the number of positive and negative output trials.
+        diff = len(pos_trials) - len(neg_trials)
+
+        # If the difference is positive, select the first half of the excess positive output trials to be set aside as evaluation trials.
+        # If the difference is negative, select the first half of the excess negative output trials to be set aside as evaluation trials.
+        if diff > 0:
+            eval_pos_trials = pos_trials[:diff // 2]
+            eval_neg_trials = np.zeros_like(eval_pos_trials)
+        elif diff < 0:
+            eval_neg_trials = neg_trials[-diff // 2:]
+            eval_pos_trials = np.zeros_like(eval_neg_trials)
+        else:
+            eval_pos_trials = np.zeros_like(pos_trials)
+            eval_neg_trials = np.zeros_like(neg_trials)
+
+        # Concatenate the remaining positive and negative output trials into a `training_trials` array.
+        training_trials = np.concatenate([pos_trials[diff // 2:], neg_trials[diff // 2:]])
+
+        # Return `training_trials` and `evaluation_trials`.
+        return training_trials, np.concatenate([eval_pos_trials, eval_neg_trials])
+
+
     def power_iteration(self, length):
         #Initial values
         log = np.zeros(length)
+        self.archive = defaultdict(list)
         self.acc = 0
 
-        for configuration in range(2**length-1):
+        for configuration in tqdm(range(2**length-1)):
             stop = False
             index = 0
             # binary counter
-            print(log)
             while not stop:
                 if log[index]==0:
                     log[index]=1
@@ -174,8 +167,28 @@ class Batcher:
                 else:
                     log[index]=0
                 index+=1
-            #Iterated updating of model archive
-            self.update_archive(Optimizer(data=self.data, params=self.cleaned_params, freqs=np.nonzero(log)[0]))
+
+            # Call the `optimize` method of the `Optimizer` class on the training and evaluation sets for each iteration.
+            #optimizer = Optimizer(data=self.data, params=self.training_trials, freqs=np.nonzero(log)[0], iterations=100, shuffles=5)
+            optimizer = Optimizer(freqs=np.nonzero(log)[0], iterations=100)
+            mean_acc = optimizer.best_acc
+
+            # Update the record of configurations and corresponding accuracy.
+            self.archive[mean_acc].append(np.nonzero(log)[0])
+            if mean_acc > self.acc:
+                self.acc = mean_acc
+
+            # Iterate through each mean accuracy in descending order.
+            for acc in sorted(self.archive.keys(), reverse=True):
+                # If the current accuracy is less than the previously recorded maximum accuracy, break the loop.
+                if acc < self.acc:
+                    break
+
+                # Update the list of configurations that resulted in the current maximum accuracy.
+                self.archive[self.acc].extend(self.archive[acc])
+
+            # Remove the configurations that did not result in the current maximum accuracy.
+            del self.archive[acc]
 
     def continuous_iteration(self):
         #just do it with lower and upper freqs
@@ -200,11 +213,18 @@ class Batcher:
 
     def get_statistics(self):
         print("Complete with maximum accuracy as " + str(self.acc) + " using models:\n")
-        if self.archive.ndim != 1:
-            for model in self.archive:
-                print(model)
-        else:
-            print(self.archive)
+        best_models = []
+        for freqs in self.archive[self.acc]:
+            optimizer = Optimizer(data=self.data, params=self.training_trials, freqs=freqs, iterations=100, shuffles=5)
+            mean_acc = optimizer.best_acc
+            stdev_acc = np.std([optimizer.optimize()[1] for i in range(10)])
+
+            best_models.append((freqs, mean_acc, stdev_acc))
+
+        for model in best_models:
+            print("Configuration (freqs):", model[0])
+            print("Mean accuracy:", model[1])
+            print("Standard deviation of accuracy:", model[2])
 
 class Pooler:
     #Running multiple sessions in parallel
