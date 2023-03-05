@@ -70,8 +70,9 @@ class Optimizer:
 
 class Batcher:
     def __init__(self, data, params, constraints, length, output_classes,
-                 output_column=2, start_col=5, end_col=7):
+                 output_column=2, start_col=5, end_col=7, iterations=100):
         self.data = data
+        self.iterations = iterations
         self.constraints = constraints
         self.cleaned_params = self.clean_params(params, start_col, end_col,
                                                 output_column, output_classes, constraints=constraints).astype(int)

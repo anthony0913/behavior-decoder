@@ -73,23 +73,46 @@ class Transform:
             stacked_blocks /= stacked_blocks.max(axis=(0, 1), keepdims=True)
         return stacked_blocks
 
-    def generate_heatmaps(self, cleaned_params_1, cleaned_params_0, output_file, freqs, normalize=False):
+    def generate_heatmaps(self, cleaned_params_1, cleaned_params_0, output_file, freqs,
+                          normalize=True, threshold=True, inf=0.5, sup=0.6):
         self.freqs = freqs
-        blocks_1 = self.get_blocks(cleaned_params_1, normalize)
-        blocks_0 = self.get_blocks(cleaned_params_0, normalize)
+        blocks_1 = self.get_blocks(cleaned_params_1,normalize)
+        blocks_0 = self.get_blocks(cleaned_params_0,normalize)
+
+        if normalize:
+            min_val = min(np.min(blocks_0),np.min(blocks_1))
+            blocks_0 -= min_val
+            blocks_1 -= min_val
+            max_val = max(np.max(blocks_0),np.max(blocks_1))
+            blocks_0 /= max_val
+            blocks_1 /= max_val
+
+        print("std", np.max(np.std(blocks_0, axis=2)), np.max(np.std(blocks_1, axis=2)))
+        print("max", np.max(blocks_0), np.max(blocks_1))
+        print("med", np.median(blocks_0), np.median(blocks_1))
+
+        if threshold:
+            blocks_0[blocks_0 < inf] = 0
+            blocks_0[blocks_0 > sup] = 1
+
+            blocks_1[blocks_1 < inf] = 0
+            blocks_1[blocks_1 > sup] = 1
 
         with PdfPages(output_file) as pdf:
             num_blocks_1 = blocks_1.shape[2]
             num_blocks_0 = blocks_0.shape[2]
             num_blocks = max(num_blocks_1, num_blocks_0)
             for i in range(num_blocks):
+                print(str(i+1) + "/" + str(num_blocks))
                 fig, axs = plt.subplots(1, 2, figsize=(10, 5))
                 if i < num_blocks_1:
                     axs[0].imshow(blocks_1[:, :, i], cmap='hot', interpolation='nearest', aspect=10)
                     axs[0].set_title('Block {}'.format(i))
+                    axs[0].set_yticks(np.arange(blocks_1.shape[0]), minor=False)
                 if i < num_blocks_0:
                     axs[1].imshow(blocks_0[:, :, i], cmap='hot', interpolation='nearest', aspect=10)
                     axs[1].set_title('Block {}'.format(i))
+                    axs[1].set_yticks(np.arange(blocks_0.shape[0]), minor=False)
                 pdf.savefig(fig)
                 plt.close()
 
