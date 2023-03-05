@@ -83,8 +83,7 @@ class Batcher:
         # Split the cleaned params array into training and evaluation sets.
         self.training_trials, self.eval_trials = self.split(self.cleaned_params)
 
-        self.power_iteration()
-        self.get_statistics()
+        self.evaluate(resamples)
 
     def clean_params(self, params, start_col, end_col, output_column, output_classes, constraints=None):
         #output style >>> [start_time | end_time | output]
@@ -128,9 +127,13 @@ class Batcher:
         return training_trials, eval_trials
 
     def evaluate(self, resamples):
-        for resample in tqdm(resamples):
-            self.power_iteration()
-        pass
+        best_models = np.zeros((resamples, self.length))
+        statistics = np.zeros((2, resamples))
+        for resample in range(resamples):
+            print("On resample " + str(resample))
+            best_models[resample, :], statistics[resample, :] = self.power_iteration()
+        print(best_models)
+        print(statistics)
 
 
     def power_iteration(self):
@@ -154,11 +157,13 @@ class Batcher:
             # Call the `optimize` method of the `Optimizer` class on the training and evaluation sets for each iteration.
             optimizer = Optimizer(data=self.data, params=self.training_trials, freqs=np.nonzero(log)[0])#, shuffles=5)
             mean_acc = optimizer.acc_mean
+            stdev_acc = optimizer.acc_stdev
 
             # Update the record of configurations and corresponding accuracy.
             archive[mean_acc].append(np.nonzero(log)[0])
             if mean_acc > best_acc:
                 best_acc = mean_acc
+                best_stdev = stdev_acc
                 print(mean_acc, np.nonzero(log)[0])
 
             # Iterate through each mean accuracy in descending order.
@@ -173,12 +178,13 @@ class Batcher:
             # Remove the configurations that did not result in the current maximum accuracy.
             del archive[acc]
             self.get_statistics(best_acc, archive)
+            return log, [best_acc, best_stdev]
 
     def continuous_iteration(self):
         #just do it with lower and upper freqs
         pass
 
-    def get_statistics(self):
+    def get_statistics(self, best_acc, archive):
         print("Complete with maximum accuracy as " + str(best_acc) + " using models:\n")
         best_models = []
         for freqs in archive[best_acc]:
