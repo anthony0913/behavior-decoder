@@ -34,7 +34,7 @@ class Optimizer:
         for trial in range(np.shape(params)[0]):
             #primitive is the corresponding block of session time series data
             primitive = data[int(params[trial,0]):int(params[trial,1]),:]
-            primitive = np.fft.rfft(primitive, axis=0).real
+            primitive = np.fft.fft(primitive, axis=0).real
             reduced_matrix[:,:,trial] = primitive[self.freqs,:]
         #rescale before returning
         reduced_matrix = np.reshape(reduced_matrix, (np.shape(params)[0],-1))
@@ -67,20 +67,6 @@ class Optimizer:
         # Calculate the mean and standard deviation of the SVM classifier evaluated on the test set.
         self.acc_mean = np.mean(accs)
         self.acc_stdev = np.std(accs)
-    '''
-    def optimize(self):
-        # Cross-validation with StratifiedKFold
-        skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=0)
-        accs = []
-        for iteration in self.iterations:
-            classifier = SVC(random_state=0, cache_size=7000, kernel="linear")
-            acc = np.mean(cross_val_score(classifier, self.train_mat[:, self.freqs], self.train_out, cv=skf, n_jobs=-1))
-            accs.append(acc)
-
-        # Calculate the mean and standard deviation of the SVM classifier evaluated on the test set.
-        self.acc_mean = np.mean(accs)
-        self.acc_stdev = np.std(accs)
-    '''
 
 class Batcher:
     def __init__(self, data, params, constraints, length, output_classes,
