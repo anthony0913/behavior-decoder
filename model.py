@@ -18,8 +18,9 @@ class Optimizer:
     def __init__(self, data, params, freqs, folds=10, skip=False):
         self.freqs = freqs  # current configuration of freqs accepted
         self.folds = folds
+        self.skip = skip
         self.train_mat, self.train_out = self.gen_reduced_matrix(data, params, self.freqs)
-        if not skip:
+        if not self.skip:
             self.optimize()
 
     def gen_reduced_matrix(self, data, params, freqs):
@@ -31,7 +32,7 @@ class Optimizer:
         axis 2 - trial
         axis 1 - neuron
         '''
-        reduced_matrix = np.zeros((np.shape(freqs)[0],np.shape(data)[1],np.shape(params)[0]))
+        reduced_matrix = np.zeros((freqs.shape[0],data.shape[1],params.shape[0]))
         for trial in range(np.shape(params)[0]):
             #primitive is the corresponding block of session time series data
             primitive = data[int(params[trial,0]):int(params[trial,1]),:]
@@ -39,7 +40,9 @@ class Optimizer:
             primitive = np.fft.fft(primitive, axis=0).real
             reduced_matrix[:,:,trial] = primitive[freqs,:]
         #rescale before returning
-        reduced_matrix = np.reshape(reduced_matrix, (np.shape(params)[0],-1))
+        if self.skip: print(reduced_matrix[:,0])
+        reduced_matrix = reduced_matrix.reshape(params.shape[0],freqs.shape[0]*data.shape[1])
+        if self.skip: print(reduced_matrix[:,0])
         return reduced_matrix, params[:,2]
 
     def optimize(self):
@@ -161,8 +164,8 @@ class Batcher:
 
             generator = Optimizer(self.data, self.eval_trials, best_models[resample, :].astype(int), skip=True)
             eval_mat = generator.train_mat
-            print(eval_mat)
             eval_out = generator.train_out
+            print(eval_mat[:,0])
 
             # Evaluate the trained SVM model on the eval_trials
             acc = svm_model.score(eval_mat, eval_out)
