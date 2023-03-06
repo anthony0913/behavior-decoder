@@ -137,7 +137,7 @@ class Batcher:
         accuracies = np.zeros((resamples, 1))
         for resample in range(resamples):
             self.training_trials, self.eval_trials = self.split(self.cleaned_params)
-            print("On resample: " + str(resample))
+            print("Current resample: " + str(resample+1))
             output = self.power_iteration()
             best_models[resample, :] = output[0] #Models are characterized by the present freqs
             statistics[resample, :] = output[1] #Model accuracies
@@ -151,7 +151,6 @@ class Batcher:
             neg_idx = np.random.choice(len(neg_trials), num_trials, replace=False)
 
             train_trials = np.concatenate([pos_trials[pos_idx], neg_trials[neg_idx]])
-            print(self.data.shape)
             generator = Optimizer(self.data, train_trials, best_models[resample, :].astype(int), skip=True)
 
             train_data = generator.train_mat
@@ -162,14 +161,17 @@ class Batcher:
 
             generator = Optimizer(self.data, self.eval_trials, best_models[resample, :].astype(int), skip=True)
             eval_mat = generator.train_mat
+            print(eval_mat)
             eval_out = generator.train_out
 
             # Evaluate the trained SVM model on the eval_trials
             acc = svm_model.score(eval_mat, eval_out)
+            accuracies[resample] = acc
             print("Accuracy on eval_trials using best model: ", acc)
 
-        print(best_models)
-        print(statistics)
+        for resample in range(resamples):
+            print(best_models[resample], statistics[resample], accuracies[resample])
+        print("\nMean:", np.mean(accuracies), "| Stdev:", np.std(accuracies))
 
 
     def power_iteration(self):
@@ -200,7 +202,7 @@ class Batcher:
             if mean_acc > best_acc:
                 best_acc = mean_acc
                 best_stdev = stdev_acc
-                print(mean_acc, np.nonzero(log)[0])
+                #print(mean_acc, np.nonzero(log)[0])
 
             # Iterate through each mean accuracy in descending order.
             for acc in sorted(archive.keys(), reverse=True):
