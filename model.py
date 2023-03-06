@@ -203,6 +203,7 @@ class Batcher:
             if mean_acc > best_acc:
                 best_acc = mean_acc
                 best_stdev = stdev_acc
+                best_model = np.nonzero(log)[0]
                 #print(mean_acc, np.nonzero(log)[0])
 
             # Iterate through each mean accuracy in descending order.
@@ -216,15 +217,18 @@ class Batcher:
 
             # Remove the configurations that did not result in the current maximum accuracy.
             del archive[acc]
-        self.get_statistics(best_acc, archive)
+        #self.get_statistics(best_acc, best_model)
+        print("Complete with maximum accuracy as " + str(best_acc) +
+              " using model:" + str(best_model))
         return log, [best_acc, best_stdev]
 
     def continuous_iteration(self):
         #just do it with lower and upper freqs
         pass
 
-    def get_statistics(self, best_acc, archive):
+    def get_statistics(self, best_acc, best_model):
         print("Complete with maximum accuracy as " + str(best_acc) + " using models:\n")
+        print()
         best_models = []
         for freqs in archive[best_acc]:
             optimizer = Optimizer(data=self.data, params=self.training_trials, freqs=freqs, folds=100, shuffles=5)
