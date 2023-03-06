@@ -32,17 +32,16 @@ class Optimizer:
         axis 2 - trial
         axis 1 - neuron
         '''
-        reduced_matrix = np.zeros((freqs.shape[0],data.shape[1],params.shape[0]))
+        reduced_matrix = np.zeros((np.shape(freqs)[0],data.shape[1],params.shape[0]))
         for trial in range(np.shape(params)[0]):
             #primitive is the corresponding block of session time series data
             primitive = data[int(params[trial,0]):int(params[trial,1]),:]
             #primitive = np.fft.rfft(primitive, axis=0).real[1:,:]
+
             primitive = np.fft.fft(primitive, axis=0).real
             reduced_matrix[:,:,trial] = primitive[freqs,:]
-        #rescale before returning
-        if self.skip: print(reduced_matrix[:,0])
-        reduced_matrix = reduced_matrix.reshape(params.shape[0],freqs.shape[0]*data.shape[1])
-        if self.skip: print(reduced_matrix[:,0])
+        reduced_matrix = reduced_matrix.reshape(params.shape[0],np.shape(freqs)[0]*data.shape[1])
+        #if self.skip: print(reduced_matrix[:,0])
         return reduced_matrix, params[:,2]
 
     def optimize(self):
@@ -154,7 +153,7 @@ class Batcher:
             neg_idx = np.random.choice(len(neg_trials), num_trials, replace=False)
 
             train_trials = np.concatenate([pos_trials[pos_idx], neg_trials[neg_idx]])
-            generator = Optimizer(self.data, train_trials, best_models[resample, :].astype(int), skip=True)
+            generator = Optimizer(self.data, train_trials, np.nonzero(best_models[resample, :].astype(int))[0], skip=True)
 
             train_data = generator.train_mat
             train_labels = generator.train_out
@@ -162,10 +161,9 @@ class Batcher:
             svm_model = SVC(random_state=0, cache_size=7000, kernel="linear")
             svm_model.fit(train_data, train_labels)
 
-            generator = Optimizer(self.data, self.eval_trials, best_models[resample, :].astype(int), skip=True)
+            generator = Optimizer(self.data, self.eval_trials, np.nonzero(best_models[resample, :].astype(int))[0], skip=True)
             eval_mat = generator.train_mat
             eval_out = generator.train_out
-            print(eval_mat[:,0])
 
             # Evaluate the trained SVM model on the eval_trials
             acc = svm_model.score(eval_mat, eval_out)
