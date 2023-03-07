@@ -83,11 +83,12 @@ class Optimizer:
 
 class Batcher:
     def __init__(self, data, params, constraints, length, output_classes,
-                 output_column=2, start_col=5, end_col=7, folds=100, resamples=10):
+                 output_column=2, start_col=5, end_col=7, folds=100, resamples=10, showDiagnostics=False):
         self.data = data
         self.folds = folds
         self.length = length
         self.constraints = constraints
+        self.showDiagnostics = showDiagnostics
         self.cleaned_params = self.clean_params(params, start_col, end_col,
                                                 output_column, output_classes, constraints=constraints).astype(int)
         self.evaluate(resamples)
@@ -145,11 +146,13 @@ class Batcher:
 
     def evaluate(self, resamples):
         best_models = np.zeros((resamples, self.length))
+        equation = np.zeros((resamples, 1)).astype(str)
         statistics = np.zeros((resamples, 2))
         accuracies = np.zeros((resamples, 1))
+        print("Starting batch job with", resamples, "resamples")
         for resample in range(resamples):
             self.training_trials, self.eval_trials = self.split(self.cleaned_params)
-            print("Current resample: " + str(resample+1))
+            if self.showDiagnostics: print("Current resample: " + str(resample+1))
             output = self.power_iteration()
             best_models[resample, :] = output[0] #Models are characterized by the present freqs
             statistics[resample, :] = output[1] #Model accuracies
@@ -176,12 +179,14 @@ class Batcher:
             svm_model = SVC(random_state=0, cache_size=7000, kernel="linear")
             svm_model.fit(train_data, np.abs(train_out-1))
             acc = svm_model.score(eval_mat, eval_out)
+
             accuracies[resample] = acc
-            print("Accuracy on", eval_out.shape[0], "eval_trials using best model: ", acc)
+            if self.showDiagnostics: print("Accuracy on", eval_out.shape[0], "eval_trials using best model: ", acc)
 
         for resample in range(resamples):
             #print(best_models[resample], statistics[resample], accuracies[resample])
-            print(accuracies[resample], np.nonzero(best_models[resample])[0], statistics[resample])
+            #print(accuracies[resample], np.nonzero(best_models[resample])[0], statistics[resample])
+            print("Resample", resample, accuracies[resample])
         print("\nMean:", np.mean(accuracies), "| Stdev:", np.std(accuracies))
 
 
@@ -228,8 +233,8 @@ class Batcher:
             # Remove the configurations that did not result in the current maximum accuracy.
             del archive[acc]
         #self.get_statistics(best_acc, best_model)
-        print("Complete with maximum accuracy as " + str(best_acc) +
-              " using model:" + str(best_model))
+        if self.showDiagnostics: print("Complete with maximum accuracy as " + str(best_acc) +
+                                       " using model:" + str(best_model))
         return log, [best_acc, best_stdev]
 
     def continuous_iteration(self):
