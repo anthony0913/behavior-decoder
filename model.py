@@ -166,7 +166,7 @@ class Batcher:
             generator = Optimizer(self.data, train_trials, np.nonzero(best_models[resample, :].astype(int))[0], skip=True)
 
             train_data = generator.train_mat
-            train_labels = generator.train_out
+            train_out = generator.train_out
 
             generator = Optimizer(self.data, self.eval_trials, np.nonzero(best_models[resample, :].astype(int))[0], skip=True)
             eval_mat = generator.train_mat
@@ -174,13 +174,14 @@ class Batcher:
 
             # Evaluate the trained SVM model on the eval_trials
             svm_model = SVC(random_state=0, cache_size=7000, kernel="linear")
-            svm_model.fit(train_data, train_labels)
-            acc = svm_model.score(eval_mat, np.abs(eval_out-1))
+            svm_model.fit(train_data, np.abs(train_out-1))
+            acc = svm_model.score(eval_mat, eval_out)
             accuracies[resample] = acc
-            print("Accuracy on eval_trials using best model: ", acc)
+            print("Accuracy on", eval_out.shape[0], "eval_trials using best model: ", acc)
 
         for resample in range(resamples):
-            print(best_models[resample], statistics[resample], accuracies[resample])
+            #print(best_models[resample], statistics[resample], accuracies[resample])
+            print(accuracies[resample], np.nonzero(best_models[resample])[0], statistics[resample])
         print("\nMean:", np.mean(accuracies), "| Stdev:", np.std(accuracies))
 
 
