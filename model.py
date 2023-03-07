@@ -97,10 +97,20 @@ class Batcher:
         output = np.zeros((1,3))
         for trial in range(np.shape(params)[0]):
             valid_trial = True
-            for constraint in constraints:
+            for constraint in constraints: #enforce constraints
                 if params[trial,constraint] != constraints[constraint]:
                     valid_trial = False
                     break
+            try: #enforce length
+                interval = int(params[trial, end_col]) - int(params[trial, start_col])
+                if interval < self.length:#enforce length
+                    valid_trial = False
+                    continue
+            except ValueError:
+                valid_trial = False
+                continue
+            if int(params[trial, end_col]) > self.data.shape[0]:
+                valid_trial = False
             if valid_trial:
                 output = np.vstack((output, params[trial, [start_col, end_col, output_column]]))
         for trial in range(1,np.shape(output)[0]):
@@ -158,15 +168,14 @@ class Batcher:
             train_data = generator.train_mat
             train_labels = generator.train_out
 
-            svm_model = SVC(random_state=0, cache_size=7000, kernel="linear")
-            svm_model.fit(train_data, train_labels)
-
             generator = Optimizer(self.data, self.eval_trials, np.nonzero(best_models[resample, :].astype(int))[0], skip=True)
             eval_mat = generator.train_mat
             eval_out = generator.train_out
 
             # Evaluate the trained SVM model on the eval_trials
-            acc = svm_model.score(eval_mat, eval_out)
+            svm_model = SVC(random_state=0, cache_size=7000, kernel="linear")
+            svm_model.fit(train_data, train_labels)
+            acc = svm_model.score(eval_mat, np.abs(eval_out-1))
             accuracies[resample] = acc
             print("Accuracy on eval_trials using best model: ", acc)
 
@@ -226,6 +235,7 @@ class Batcher:
         #just do it with lower and upper freqs
         pass
 
+    '''
     def get_statistics(self, best_acc, best_model):
         print("Complete with maximum accuracy as " + str(best_acc) + " using models:\n")
         print()
@@ -241,6 +251,7 @@ class Batcher:
             print("Configuration (freqs):", model[0])
             print("Mean accuracy:", model[1])
             print("Standard deviation of accuracy:", model[2])
+    '''
 
 class Pooler:
     #Running multiple sessions in parallel
