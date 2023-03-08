@@ -15,13 +15,15 @@ from tqdm import tqdm
 
 
 class Optimizer:
-    def __init__(self, data, params, freqs, iterations=10):
+    def __init__(self, data, params, freqs, folds=10, skip=False):
         self.freqs = freqs  # current configuration of freqs accepted
-        self.iterations = iterations
-        self.train_mat, self.train_out = self.gen_reduced_matrix(data, params)
-        self.optimize()
+        self.folds = folds
+        self.skip = skip
+        self.train_mat, self.train_out = self.gen_reduced_matrix(data, params, self.freqs)
+        if not self.skip:
+            self.optimize()
 
-    def gen_reduced_matrix(self, data, params):
+    def gen_reduced_matrix(self, data, params, freqs):
         '''
         Generates a reduced matrix separating individual trials
         flattened reduced matrix - change documentation here later
@@ -30,14 +32,16 @@ class Optimizer:
         axis 2 - trial
         axis 1 - neuron
         '''
-        reduced_matrix = np.zeros((np.shape(self.freqs)[0],np.shape(data)[1],np.shape(params)[0]))
+        reduced_matrix = np.zeros((np.shape(freqs)[0],data.shape[1],params.shape[0]))
         for trial in range(np.shape(params)[0]):
             #primitive is the corresponding block of session time series data
             primitive = data[int(params[trial,0]):int(params[trial,1]),:]
+            #primitive = np.fft.rfft(primitive, axis=0).real[1:,:]
+
             primitive = np.fft.fft(primitive, axis=0).real
-            reduced_matrix[:,:,trial] = primitive[self.freqs,:]
-        #rescale before returning
-        reduced_matrix = np.reshape(reduced_matrix, (np.shape(params)[0],-1))
+            reduced_matrix[:,:,trial] = primitive[freqs,:]
+        reduced_matrix = reduced_matrix.reshape(params.shape[0],np.shape(freqs)[0]*data.shape[1])
+        #if self.skip: print(reduced_matrix[:,0])
         return reduced_matrix, params[:,2]
 
     def optimize(self):
@@ -61,8 +65,17 @@ class Optimizer:
         accs = []
         for train_index, test_index in skf.split(train_data, train_labels):
             classifier = SVC(random_state=0, cache_size=7000, kernel="linear")
-            classifier.fit(train_data[train_index][:, self.freqs], train_labels[train_index])
-            acc = classifier.score(val_data[:, self.freqs], val_labels)
+
+            current_data = np.reshape(train_data[train_index],(np.shape(train_index)[0],-1))
+            current_labels = train_labels[train_index].astype(int)
+
+            score_data = np.reshape(train_data[test_index],(np.shape(test_index)[0],-1))
+            score_data = np.vstack((score_data, val_data))
+            score_labels = train_labels[test_index].astype(int)
+            score_labels = np.hstack((score_labels, val_labels))
+
+            classifier.fit(current_data, current_labels)
+            acc = classifier.score(score_data, score_labels)
             accs.append(acc)
         # Calculate the mean and standard deviation of the SVM classifier evaluated on the test set.
         self.acc_mean = np.mean(accs)
@@ -70,28 +83,35 @@ class Optimizer:
 
 class Batcher:
     def __init__(self, data, params, constraints, length, output_classes,
-                 output_column=2, start_col=5, end_col=7, iterations=100):
+                 output_column=2, start_col=5, end_col=7, folds=100, resamples=10, showDiagnostics=False):
         self.data = data
-        self.iterations = iterations
+        self.folds = folds
+        self.length = length
         self.constraints = constraints
+        self.showDiagnostics = showDiagnostics
         self.cleaned_params = self.clean_params(params, start_col, end_col,
                                                 output_column, output_classes, constraints=constraints).astype(int)
-
-        # Split the cleaned params array into training and evaluation sets.
-        self.training_trials, self.eval_trials = self.split(self.cleaned_params)
-
-        self.power_iteration(length)
-        self.get_statistics()
+        self.evaluate(resamples)
 
     def clean_params(self, params, start_col, end_col, output_column, output_classes, constraints=None):
         #output style >>> [start_time | end_time | output]
         output = np.zeros((1,3))
         for trial in range(np.shape(params)[0]):
             valid_trial = True
-            for constraint in constraints:
+            for constraint in constraints: #enforce constraints
                 if params[trial,constraint] != constraints[constraint]:
                     valid_trial = False
                     break
+            try: #enforce length
+                interval = int(params[trial, end_col]) - int(params[trial, start_col])
+                if interval < self.length:#enforce length
+                    valid_trial = False
+                    continue
+            except ValueError:
+                valid_trial = False
+                continue
+            if int(params[trial, end_col]) > self.data.shape[0]:
+                valid_trial = False
             if valid_trial:
                 output = np.vstack((output, params[trial, [start_col, end_col, output_column]]))
         for trial in range(1,np.shape(output)[0]):
@@ -124,14 +144,59 @@ class Batcher:
         # Return `training_trials` and `evaluation_trials`.
         return training_trials, eval_trials
 
+    def evaluate(self, resamples):
+        best_models = np.zeros((resamples, self.length))
+        equation = np.zeros((resamples, 1)).astype(str)
+        statistics = np.zeros((resamples, 2))
+        accuracies = np.zeros((resamples, 1))
+        print("Starting batch job with", resamples, "resamples")
+        for resample in range(resamples):
+            self.training_trials, self.eval_trials = self.split(self.cleaned_params)
+            if self.showDiagnostics: print("Current resample: " + str(resample+1))
+            output = self.power_iteration()
+            best_models[resample, :] = output[0] #Models are characterized by the present freqs
+            statistics[resample, :] = output[1] #Model accuracies
+            accuracies[resample, :] = 0 #Based off eval trials
 
-    def power_iteration(self, length):
+            # Train an SVM model on the best model (freqs) generated by power_iteration() using the same number of trials from each class
+            pos_trials = self.training_trials[self.training_trials[:, 2] == 1]
+            neg_trials = self.training_trials[self.training_trials[:, 2] == 0]
+            num_trials = min(len(pos_trials), len(neg_trials))
+            pos_idx = np.random.choice(len(pos_trials), num_trials, replace=False)
+            neg_idx = np.random.choice(len(neg_trials), num_trials, replace=False)
+
+            train_trials = np.concatenate([pos_trials[pos_idx], neg_trials[neg_idx]])
+            generator = Optimizer(self.data, train_trials, np.nonzero(best_models[resample, :].astype(int))[0], skip=True)
+
+            train_data = generator.train_mat
+            train_out = generator.train_out
+
+            generator = Optimizer(self.data, self.eval_trials, np.nonzero(best_models[resample, :].astype(int))[0], skip=True)
+            eval_mat = generator.train_mat
+            eval_out = generator.train_out
+
+            # Evaluate the trained SVM model on the eval_trials
+            svm_model = SVC(random_state=0, cache_size=7000, kernel="linear")
+            svm_model.fit(train_data, np.abs(train_out-1))
+            acc = svm_model.score(eval_mat, eval_out)
+
+            accuracies[resample] = acc
+            if self.showDiagnostics: print("Accuracy on", eval_out.shape[0], "eval_trials using best model: ", acc)
+
+        for resample in range(resamples):
+            #print(best_models[resample], statistics[resample], accuracies[resample])
+            #print(accuracies[resample], np.nonzero(best_models[resample])[0], statistics[resample])
+            print("Resample", resample, accuracies[resample])
+        print("\nMean:", np.mean(accuracies), "| Stdev:", np.std(accuracies))
+
+
+    def power_iteration(self):
         #Initial values
-        log = np.zeros(length)
-        self.archive = defaultdict(list)
-        self.acc = 0
+        log = np.zeros(self.length)
+        archive = defaultdict(list)
+        best_acc = 0
 
-        for configuration in tqdm(range(2**length-1)):
+        for configuration in tqdm(range(2**self.length-1)):
             stop = False
             index = 0
             # binary counter
@@ -146,51 +211,43 @@ class Batcher:
             # Call the `optimize` method of the `Optimizer` class on the training and evaluation sets for each iteration.
             optimizer = Optimizer(data=self.data, params=self.training_trials, freqs=np.nonzero(log)[0])#, shuffles=5)
             mean_acc = optimizer.acc_mean
+            stdev_acc = optimizer.acc_stdev
 
             # Update the record of configurations and corresponding accuracy.
-            self.archive[mean_acc].append(np.nonzero(log)[0])
-            if mean_acc > self.acc:
-                self.acc = mean_acc
-                print(mean_acc, np.nonzero(log)[0])
+            archive[mean_acc].append(np.nonzero(log)[0])
+            if mean_acc > best_acc:
+                best_acc = mean_acc
+                best_stdev = stdev_acc
+                best_model = np.nonzero(log)[0]
+                #print(mean_acc, np.nonzero(log)[0])
 
             # Iterate through each mean accuracy in descending order.
-            for acc in sorted(self.archive.keys(), reverse=True):
+            for acc in sorted(archive.keys(), reverse=True):
                 # If the current accuracy is less than the previously recorded maximum accuracy, break the loop.
-                if acc < self.acc:
+                if acc < acc:
                     break
 
                 # Update the list of configurations that resulted in the current maximum accuracy.
-                self.archive[self.acc].extend(self.archive[acc])
+                archive[acc].extend(archive[acc])
 
             # Remove the configurations that did not result in the current maximum accuracy.
-            del self.archive[acc]
+            del archive[acc]
+        #self.get_statistics(best_acc, best_model)
+        if self.showDiagnostics: print("Complete with maximum accuracy as " + str(best_acc) +
+                                       " using model:" + str(best_model))
+        return log, [best_acc, best_stdev]
 
     def continuous_iteration(self):
         #just do it with lower and upper freqs
         pass
 
-    def update_archive(self, new_config):
-        #Update archived configurations and corresponding accuracy
-        new_acc = new_config.acc_mean
-        if new_acc > self.acc:
-            #Remove previously archive and accuracy
-            self.acc = new_acc
-            self.archive = new_config.freqs
-            self.stdevs = new_config.acc_stdev
-        elif new_acc == self.acc:
-            #Add current configuration to list of configurations corresponding to current accuracy
-            self.archive = np.append(self.archive, new_config.freqs, axis=0)
-            self.stdevs = np.append(self.stdevs, new_config.acc_stdev)
-        elif new_acc < self.acc:
-            #Ignore current configuration
-            pass
-        #nevermind don't use hashmaps lol
-
-    def get_statistics(self):
-        print("Complete with maximum accuracy as " + str(self.acc) + " using models:\n")
+    '''
+    def get_statistics(self, best_acc, best_model):
+        print("Complete with maximum accuracy as " + str(best_acc) + " using models:\n")
+        print()
         best_models = []
-        for freqs in self.archive[self.acc]:
-            optimizer = Optimizer(data=self.data, params=self.training_trials, freqs=freqs, iterations=100, shuffles=5)
+        for freqs in archive[best_acc]:
+            optimizer = Optimizer(data=self.data, params=self.training_trials, freqs=freqs, folds=100, shuffles=5)
             mean_acc = optimizer.acc_mean
             stdev_acc = np.std([optimizer.optimize()[1] for i in range(10)])
 
@@ -200,6 +257,7 @@ class Batcher:
             print("Configuration (freqs):", model[0])
             print("Mean accuracy:", model[1])
             print("Standard deviation of accuracy:", model[2])
+    '''
 
 class Pooler:
     #Running multiple sessions in parallel
