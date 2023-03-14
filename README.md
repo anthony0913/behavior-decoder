@@ -1,3 +1,5 @@
+outdated (will fix soon)
+
 # How to use
 This script searches for singular value decomposition (SVD) models that best describe a given dataset. In particular, SVD is applied to the component frequencies of multiple time series recordings to describe two-choice phenomena that may occur several times within a single recording session, e.g., predicting the results of a behavior testing session that contains 150 trials from time series data of 200 neuron recordings. 
 
