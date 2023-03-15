@@ -47,10 +47,8 @@ class Optimizer:
         pos_trials = self.train_mat[self.train_out == 1]
         neg_trials = self.train_mat[self.train_out == 0]
         if len(pos_trials) > len(neg_trials):
-            print("start",pos_trials.shape)
             pos_trials, pos_val = train_test_split(pos_trials, test_size=len(pos_trials) - len(neg_trials),
                                                    stratify=self.train_out[self.train_out == 1])
-            print(pos_trials.shape, pos_val.shape)
             val_data = pos_val
             val_labels = np.ones(len(val_data))
         elif len(pos_trials) < len(neg_trials):
@@ -59,7 +57,6 @@ class Optimizer:
             val_data = neg_val
             val_labels = np.zeros(len(val_data))
         else:
-            # TODO: same trials
             size = len(pos_trials) // 3 # TODO: Generalize split
             pos_trials, pos_val = train_test_split(pos_trials, test_size=size, stratify=self.train_out[self.train_out == 1])
             neg_trials, neg_val = train_test_split(neg_trials, test_size=size, stratify=self.train_out[self.train_out == 0])
