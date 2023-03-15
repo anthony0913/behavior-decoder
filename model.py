@@ -13,7 +13,6 @@ from sklearn.utils import shuffle
 from collections import defaultdict
 from tqdm import tqdm
 
-
 class Optimizer:
     def __init__(self, data, params, freqs, folds=10, skip=False):
         self.freqs = freqs  # current configuration of freqs accepted
@@ -48,15 +47,24 @@ class Optimizer:
         pos_trials = self.train_mat[self.train_out == 1]
         neg_trials = self.train_mat[self.train_out == 0]
         if len(pos_trials) > len(neg_trials):
+            print("start",pos_trials.shape)
             pos_trials, pos_val = train_test_split(pos_trials, test_size=len(pos_trials) - len(neg_trials),
                                                    stratify=self.train_out[self.train_out == 1])
+            print(pos_trials.shape, pos_val.shape)
             val_data = pos_val
             val_labels = np.ones(len(val_data))
-        else:
+        elif len(pos_trials) < len(neg_trials):
             neg_trials, neg_val = train_test_split(neg_trials, test_size=len(neg_trials) - len(pos_trials),
                                                    stratify=self.train_out[self.train_out == 0])
             val_data = neg_val
             val_labels = np.zeros(len(val_data))
+        else:
+            # TODO: same trials
+            size = len(pos_trials) // 3 # TODO: Generalize split
+            pos_trials, pos_val = train_test_split(pos_trials, test_size=size, stratify=self.train_out[self.train_out == 1])
+            neg_trials, neg_val = train_test_split(neg_trials, test_size=size, stratify=self.train_out[self.train_out == 0])
+            val_data =  np.vstack((pos_val, neg_val))
+            val_labels = np.concatenate((np.ones(len(pos_val)),np.zeros(len(neg_val))))
         train_data = np.concatenate([pos_trials, neg_trials])
         train_labels = np.concatenate([np.ones(len(pos_trials)), np.zeros(len(neg_trials))])
 
@@ -133,13 +141,16 @@ class Batcher:
         # If the difference is negative, select the second half of the excess negative output trials to be set aside as evaluation trials.
         if diff > 0:
             eval_trials = pos_trials[abs(diff) // 2:]
+            # Concatenate the remaining positive and negative output trials into a `training_trials` array.
+            training_trials = np.concatenate([pos_trials[:abs(diff) // 2], neg_trials[:abs(diff) // 2]])
         elif diff < 0:
             eval_trials = neg_trials[abs(diff) // 2:]
+            # See above comment
+            training_trials = np.concatenate([pos_trials[:abs(diff) // 2], neg_trials[:abs(diff) // 2]])
         else:
-            print("Error: Please perform train test split manually")
-
-        # Concatenate the remaining positive and negative output trials into a `training_trials` array.
-        training_trials = np.concatenate([pos_trials[:abs(diff) // 2], neg_trials[:abs(diff) // 2]])
+            split = len(pos_trials) // 3 # TODO: generalize split parameter
+            eval_trials = np.concatenate([pos_trials[:split], neg_trials[:split]])
+            training_trials = np.concatenate([pos_trials[split:], neg_trials[split:]])
 
         # Return `training_trials` and `evaluation_trials`.
         return training_trials, eval_trials
