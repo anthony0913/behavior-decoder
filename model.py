@@ -47,8 +47,10 @@ class Optimizer:
         pos_trials = self.train_mat[self.train_out == 1]
         neg_trials = self.train_mat[self.train_out == 0]
         if len(pos_trials) > len(neg_trials):
+            print("start",pos_trials.shape)
             pos_trials, pos_val = train_test_split(pos_trials, test_size=len(pos_trials) - len(neg_trials),
                                                    stratify=self.train_out[self.train_out == 1])
+            print(pos_trials.shape, pos_val.shape)
             val_data = pos_val
             val_labels = np.ones(len(val_data))
         elif len(pos_trials) < len(neg_trials):
@@ -58,7 +60,11 @@ class Optimizer:
             val_labels = np.zeros(len(val_data))
         else:
             # TODO: same trials
-            pass
+            size = len(pos_trials) // 3 # TODO: Generalize split
+            pos_trials, pos_val = train_test_split(pos_trials, test_size=size, stratify=self.train_out[self.train_out == 1])
+            neg_trials, neg_val = train_test_split(neg_trials, test_size=size, stratify=self.train_out[self.train_out == 0])
+            val_data =  np.vstack((pos_val, neg_val))
+            val_labels = np.concatenate((np.ones(len(pos_val)),np.zeros(len(neg_val))))
         train_data = np.concatenate([pos_trials, neg_trials])
         train_labels = np.concatenate([np.ones(len(pos_trials)), np.zeros(len(neg_trials))])
 
@@ -130,7 +136,6 @@ class Batcher:
 
         # Compute the difference between the number of positive and negative output trials.
         diff = len(pos_trials) - len(neg_trials)
-        print(len(pos_trials),len(neg_trials),diff)
 
         # If the difference is positive, select the second half of the excess positive output trials to be set aside as evaluation trials.
         # If the difference is negative, select the second half of the excess negative output trials to be set aside as evaluation trials.
@@ -143,13 +148,11 @@ class Batcher:
             # See above comment
             training_trials = np.concatenate([pos_trials[:abs(diff) // 2], neg_trials[:abs(diff) // 2]])
         else:
-            print("0 diff case") # TODO: remove after done later
             split = len(pos_trials) // 3 # TODO: generalize split parameter
             eval_trials = np.concatenate([pos_trials[:split], neg_trials[:split]])
             training_trials = np.concatenate([pos_trials[split:], neg_trials[split:]])
 
         # Return `training_trials` and `evaluation_trials`.
-        print(len(eval_trials))
         return training_trials, eval_trials
 
     def evaluate(self, resamples):
