@@ -100,6 +100,7 @@ class Batcher:
 
     def clean_params(self, params, start_col, end_col, output_column, output_classes, constraints=None):
         #output style >>> [start_time | end_time | output]
+        self.len_skip = 0
         output = np.zeros((1,3))
         for trial in range(np.shape(params)[0]):
             valid_trial = True
@@ -110,6 +111,8 @@ class Batcher:
             try: #enforce length
                 interval = int(params[trial, end_col]) - int(params[trial, start_col])
                 if interval < self.length:#enforce length
+                    if valid_trial:
+                        self.len_skip += 1
                     valid_trial = False
                     continue
             except ValueError:
@@ -217,6 +220,7 @@ class Batcher:
         print("\nMean:", np.mean(accuracies), "| Stdev:", np.std(accuracies))
         print("Training trials accounted for", str(100 * self.ratio) + "% of the total trials")
         print("The behavioral ratio was", str(self.behavioral) + "% correct")
+        print(str(self.len_skip), "trials were omitted due to insufficient length")
 
     def standard_iteration(self):
         return np.ones(self.length)
