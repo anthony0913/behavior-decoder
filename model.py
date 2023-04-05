@@ -150,6 +150,8 @@ class Batcher:
             training_trials = np.concatenate([pos_trials[split:], neg_trials[split:]])
 
         # Return `training_trials` and `evaluation_trials`.
+        #print("training:", training_trials.shape)
+        #print("eval", eval_trials.shape)
         return training_trials, eval_trials
 
     def evaluate(self, resamples):
@@ -161,7 +163,8 @@ class Batcher:
         for resample in range(resamples):
             self.training_trials, self.eval_trials = self.split(self.cleaned_params)
             if self.showDiagnostics: print("Current resample: " + str(resample+1))
-            output = self.power_iteration()
+            #output = self.power_iteration()
+            output = self.standard_iteration()
             best_models[resample, :] = output[0] #Models are characterized by the present freqs
             statistics[resample, :] = output[1] #Model accuracies
             accuracies[resample, :] = 0 #Based off eval trials
@@ -197,6 +200,8 @@ class Batcher:
             print("Resample", resample, accuracies[resample])
         print("\nMean:", np.mean(accuracies), "| Stdev:", np.std(accuracies))
 
+    def standard_iteration(self):
+        return np.ones(self.length)
 
     def power_iteration(self):
         #Initial values

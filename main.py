@@ -1,4 +1,5 @@
 from model import *
+mainLength = 10
 
 #Runs model
 pool = Pooler(["datasets/data.csv"], ["datasets/params.csv"])
