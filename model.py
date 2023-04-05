@@ -123,7 +123,26 @@ class Batcher:
             output[trial, -1] = output_classes[output[trial, -1]]#converts output from an object to a numerical value
         return output[1:,:]
 
-    def split(self, params):
+    def split(self, params, minimum=10):
+        params = shuffle(params)
+        pos_trials = params[params[:, 2] == 1]
+        neg_trials = params[params[:, 2] == 0]
+
+        pre_min = min(pos_trials.shape[0], neg_trials.shape[0])
+        if pre_min < minimum:
+            if pre_min == 0:
+                print("ERROR: There are no trials for at least one of the classes, SVM cannot be performed on this dataset!")
+            else:
+                print("WARNING: There are less than", minimum, "trials of each class! Training trials"
+                                                               " have been automatically adjusted to", str(pre_min - 1), "of each class")
+            minimum = pre_min - 1
+        training_trials = np.concatenate([pos_trials[:minimum], neg_trials[:minimum]])
+        eval_trials = np.concatenate([pos_trials[minimum:], neg_trials[minimum:]])
+        self.ratio = training_trials.shape[0] / (training_trials.shape[0] + eval_trials.shape[0])
+        self.behavioral = pos_trials.shape[0] / (pos_trials.shape[0] + neg_trials.shape[0])
+        return training_trials, eval_trials
+
+    def split2(self, params):
         # Randomly shuffle the input params array.
         params = shuffle(params)
 
@@ -135,7 +154,6 @@ class Batcher:
         diff = len(pos_trials) - len(neg_trials)
 
         # If the difference is positive, select the second half of the excess positive output trials to be set aside as evaluation trials.
-        # If the difference is negative, select the second half of the excess negative output trials to be set aside as evaluation trials.
         if diff > 0:
             eval_trials = pos_trials[abs(diff) // 2:]
             # Concatenate the remaining positive and negative output trials into a `training_trials` array.
@@ -149,9 +167,7 @@ class Batcher:
             eval_trials = np.concatenate([pos_trials[:split], neg_trials[:split]])
             training_trials = np.concatenate([pos_trials[split:], neg_trials[split:]])
 
-        # Return `training_trials` and `evaluation_trials`.
-        #print("training:", training_trials.shape)
-        #print("eval", eval_trials.shape)
+        self.ratio = training_trials.shape[0] / (training_trials.shape[0] + eval_trials.shape[0])
         return training_trials, eval_trials
 
     def evaluate(self, resamples):
@@ -199,6 +215,8 @@ class Batcher:
             #print(accuracies[resample], np.nonzero(best_models[resample])[0], statistics[resample])
             print("Resample", resample, accuracies[resample])
         print("\nMean:", np.mean(accuracies), "| Stdev:", np.std(accuracies))
+        print("Training trials accounted for", str(100 * self.ratio) + "% of the total trials")
+        print("The behavioral ratio was", str(self.behavioral) + "% correct")
 
     def standard_iteration(self):
         return np.ones(self.length)
