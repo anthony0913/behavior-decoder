@@ -196,3 +196,18 @@ class Pooler:
         params = np.array(params_array, dtype=object)
 
         return data, params
+
+    def parallel_run(self, data_path, param_path):
+        data, params = self.single_run(data_path, param_path)
+        batch = Batcher(data, params, constraints={1: "INIT", 4: "clean"}, length=10,
+                        output_classes={"wrong": 0, "correct": 1}, output_column=3, start_col=6, end_col=7, folds=10,
+                        resamples=10, showDiagnostics=False)
+        return np.array([np.mean(batch.accuracies), np.std(batch.accuracies)])
+
+    # TODO: make a path/params array and pass to pool.map
+    '''
+    def full_run(self):
+        with multiprocessing.Pool() as pool:
+            results = pool.map(self.parallel_run, ???)
+        print(results)
+    '''
