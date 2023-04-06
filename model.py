@@ -1,11 +1,12 @@
 import numpy as np
 import csv
 
-#from sklearn.cluster import AffinityPropagation, SpectralClustering, KMeans
 from sklearn.svm import SVC
 from sklearn.utils import shuffle
 from collections import defaultdict
 from tqdm import tqdm
+
+import multiprocessing
 
 class Optimizer:
     def __init__(self, data, params, kernel="poly", length=10, resamples=10, minimum=10):
@@ -18,7 +19,6 @@ class Optimizer:
 
         self.acc = self.optimize()
         self.cacc = self.optimize(randomize=True)
-
 
     def optimize(self, randomize=False):
         acc = np.zeros(self.resamples)
@@ -50,10 +50,10 @@ class Optimizer:
         pre_min = min(pos_trials.shape[0], neg_trials.shape[0])
         if pre_min < self.minimum:
             if pre_min == 0:
-                print("ERROR: There are no trials for at least one of the classes, SVM cannot be performed on this dataset!")
+                print("\033[1m" + "ERROR: There are no trials for at least one of the classes, SVM cannot be performed on this dataset!" + "\033[0m")
             else:
-                print("WARNING: There are less than", self.minimum, "trials of each class! Training trials"
-                                                               " have been automatically adjusted to", str(pre_min - 1), "of each class")
+                print("\033[1m" + "WARNING: There are less than", self.minimum, "trials of each class! Training "
+                        "trials have been automatically adjusted to", str(pre_min - 1), "of each class" + "\033[0m")
             self.minimum = pre_min - 1
         training_trials = np.concatenate([pos_trials[:self.minimum], neg_trials[:self.minimum]])
         if randomize: np.random.shuffle(training_trials[:,-1])
@@ -103,26 +103,25 @@ class Batcher:
         return output[1:,:]
 
     def evaluate(self, resamples):
-        best_models = np.zeros((resamples, self.length))
-        equation = np.zeros((resamples, 1)).astype(str)
-        statistics = np.zeros((resamples, 2))
-        accuracies = np.zeros((resamples, 1))
         print("Starting batch job with", resamples, "resamples")
         model = Optimizer(data=self.data, params=self.cleaned_params, kernel="poly", length=self.length,
-                               resamples=resamples)
-        accuracies = model.acc
-        control_accuracies = model.cacc
+                          resamples=resamples)
+        self.accuracies = model.acc
+        self.control_accuracies = model.cacc
+        self.ratio = model.ratio
+        self.behavioral = model.behavioral
 
         for resample in range(resamples):
-            #print(best_models[resample], statistics[resample], accuracies[resample])
-            #print(accuracies[resample], np.nonzero(best_models[resample])[0], statistics[resample])
-            #print("Resample", resample, accuracies[resample])
+            if self.showDiagnostics:
+                print("Resample", resample, self.accuracies[resample])
             pass
-        print("\nMean:", np.mean(accuracies), "| Stdev:", np.std(accuracies), "(Model)")
-        print("\nMean:", np.mean(control_accuracies), "| Stdev:", np.std(control_accuracies), "(Control)")
-        #print("Training trials accounted for", str(100 * self.ratio) + "% of the total trials")
-        #print("The behavioral ratio was", str(self.behavioral) + "% correct")
+        print("-"*65)
+        print("Mean:", np.mean(self.accuracies), "| Stdev:", np.std(self.accuracies), "(Model)")
+        print("Mean:", np.mean(self.control_accuracies), "| Stdev:", np.std(self.control_accuracies), "(Control)")
+        print("Training trials accounted for", str(100 * self.ratio) + "% of the total trials")
+        print("The behavioral ratio was", str(self.behavioral) + "% correct")
         print(str(self.len_skip), "trials were omitted due to insufficient length")
+        print("-"*65)
 
     def standard_iteration(self):
         return np.ones(self.length)
