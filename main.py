@@ -37,6 +37,7 @@ plt.errorbar(np.arange(len(session_info)), session_info[:, 0], yerr=session_info
 plt.xlabel('Accuracy')
 plt.ylabel('Index')
 plt.title('Accuracy vs Index')
+plt.ylim(0,1)
 
 # show the plot
 plt.show()

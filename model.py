@@ -3,19 +3,21 @@ import csv
 
 from sklearn.svm import SVC
 from sklearn.utils import shuffle
+from sklearn.decomposition import PCA
 from collections import defaultdict
 from tqdm import tqdm
 
 import multiprocessing
 
 class Optimizer:
-    def __init__(self, data, params, kernel="poly", length=10, resamples=10, minimum=10):
+    def __init__(self, data, params, kernel="poly", length=10, resamples=10, minimum=100, pca=3):
         self.data = data
         self.params = params
         self.kernel = kernel
         self.length = length
         self.resamples = resamples
         self.minimum = minimum
+        self.pca = pca
 
         self.acc = self.optimize()
         self.cacc = self.optimize(randomize=True)
@@ -25,18 +27,33 @@ class Optimizer:
         for resample in range(self.resamples):
             # Reset train/eval trials
             train_trials, eval_trials = self.split(self.params, randomize=randomize)
-            train_data = np.zeros((train_trials.shape[0], (self.data.shape[1] - 1) * self.length))
-            eval_data = np.zeros((eval_trials.shape[0], (self.data.shape[1] - 1) * self.length))
+            if self.pca == None:
+                train_data = np.zeros((train_trials.shape[0], (self.data.shape[1] - 1) * self.length))
+                eval_data = np.zeros((eval_trials.shape[0], (self.data.shape[1] - 1) * self.length))
+            else:
+                train_data = np.zeros((train_trials.shape[0], self.pca * self.length))
+                eval_data = np.zeros((eval_trials.shape[0], self.pca * self.length))
+                pca = PCA(n_components=self.pca)
 
             # Configure train/eval data
             for trial in range(train_trials.shape[0]):
                 primitive = self.data[train_trials[trial, 0]:train_trials[trial, 1], 1:]
-                train_data[trial, :] = np.real(np.fft.fft(primitive)[:self.length].flatten())
+                primitive = np.real(np.fft.fft(primitive)[:self.length])
+                if self.pca != None:
+                    primitive = pca.fit_transform(primitive)
+                    pass
+                primitive = primitive.flatten()
+                train_data[trial, :] = primitive
             for trial in range(eval_trials.shape[0]):
                 primitive = self.data[eval_trials[trial, 0]:eval_trials[trial, 1], 1:]
-                eval_data[trial, :] = np.real(np.fft.fft(primitive)[:self.length].flatten())
+                primitive = np.real(np.fft.fft(primitive)[:self.length])
+                if self.pca != None:
+                    primitive = pca.fit_transform(primitive)
+                    pass
+                primitive = primitive.flatten()
+                eval_data[trial, :] = primitive
 
-            # Scoring
+            # Model
             model = SVC(random_state=0, cache_size=7000, kernel=self.kernel)
             model.fit(train_data, train_trials[:, -1])
             acc[resample] = model.score(eval_data, eval_trials[:,-1])
