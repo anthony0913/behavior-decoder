@@ -4,13 +4,16 @@ import csv
 from sklearn.svm import SVC
 from sklearn.utils import shuffle
 from sklearn.decomposition import PCA
+from sklearn.metrics.pairwise import cosine_similarity
 from collections import defaultdict
 from tqdm import tqdm
 
 import multiprocessing
+import visualization as vis
+import matplotlib.pyplot as plt
 
 class Optimizer:
-    def __init__(self, data, params, kernel="poly", length=10, resamples=10, minimum=100, pca=3):
+    def __init__(self, data, params, kernel="poly", length=10, resamples=10, minimum=100, pca=2, visualize=False):
         self.data = data
         self.params = params
         self.kernel = kernel
@@ -19,8 +22,50 @@ class Optimizer:
         self.minimum = minimum
         self.pca = pca
 
-        self.acc = self.optimize()
-        self.cacc = self.optimize(randomize=True)
+        if visualize:
+            self.gen_vis(self.params)
+        else:
+            self.acc = self.optimize()
+            self.cacc = self.optimize(randomize=True)
+
+    def gen_vis(self, params, skip=0):
+        pos_trials = params[params[:, 2] == 1]
+        neg_trials = params[params[:, 2] == 0]
+        pos = self.gamma_mat(pos_trials, skip)
+        neg = self.gamma_mat(neg_trials, skip)
+        pos = self.sort(pos)
+        neg = self.sort(neg)
+        #vis.Display("pos", pos)
+        #vis.Display("neg", neg)
+        g = -5000 * np.ones((1, pos.shape[1]))
+        temp = np.vstack((pos, g))
+        temp = np.vstack((temp, neg))
+
+        plt.imshow(temp)
+        plt.show()
+
+    def sort(self, mat):
+        sim = cosine_similarity(mat)
+        output = mat[np.argsort(sim[:, 0]), :]
+        return output
+        #sorted = mat[mat[:,0].argsort()]
+        #return sorted
+
+    def gamma_mat(self, params, skip):
+        if self.pca!=None:
+            output = np.zeros((params.shape[0], self.length * self.pca))
+        else:
+            output = np.zeros((params.shape[0], (self.data.shape[1] - 1) * (self.length - skip)))
+        for trial in range(params.shape[0]):
+            primitive = self.data[params[trial, 0]:params[trial, 1], 1:]
+            primitive = np.real(np.fft.fft(primitive)[:self.length])[skip:]
+            if self.pca != None:
+                pca = PCA(n_components=self.pca)
+                primitive = pca.fit_transform(primitive)
+            primitive = primitive.flatten("F")
+            output[trial, :] = primitive
+        return output
+
 
     def optimize(self, randomize=False):
         acc = np.zeros(self.resamples)
@@ -70,7 +115,7 @@ class Optimizer:
                 print("\033[1m" + "ERROR: There are no trials for at least one of the classes, SVM cannot be performed on this dataset!" + "\033[0m")
             else:
                 print("\033[1m" + "WARNING: There are less than", self.minimum, "trials of each class! Training "
-                        "trials have been automatically adjusted to", str(pre_min - 1), "of each class" + "\033[0m")
+                                                                                "trials have been automatically adjusted to", str(pre_min - 1), "of each class" + "\033[0m")
             self.minimum = pre_min - 1
         training_trials = np.concatenate([pos_trials[:self.minimum], neg_trials[:self.minimum]])
         if randomize: np.random.shuffle(training_trials[:,-1])
@@ -81,7 +126,7 @@ class Optimizer:
 
 class Batcher:
     def __init__(self, data, params, constraints, length, output_classes,
-                 output_column=2, start_col=5, end_col=7, folds=100, resamples=10, showDiagnostics=False):
+                 output_column=2, start_col=5, end_col=7, folds=100, resamples=10, showDiagnostics=False, visualize=False):
         self.data = data
         self.folds = folds
         self.length = length
@@ -89,7 +134,10 @@ class Batcher:
         self.showDiagnostics = showDiagnostics
         self.cleaned_params = self.clean_params(params, start_col, end_col,
                                                 output_column, output_classes, constraints=constraints).astype(int)
-        self.evaluate(resamples)
+        if visualize:
+            self.gen_vis()
+        else:
+            self.evaluate(resamples)
 
     def clean_params(self, params, start_col, end_col, output_column, output_classes, constraints=None):
         #output style >>> [start_time | end_time | output]
@@ -118,6 +166,9 @@ class Batcher:
         for trial in range(1,np.shape(output)[0]):
             output[trial, -1] = output_classes[output[trial, -1]]#converts output from an object to a numerical value
         return output[1:,:]
+
+    def gen_vis(self):
+        model = Optimizer(data=self.data, params=self.cleaned_params, length=self.length, visualize=True)
 
     def evaluate(self, resamples):
         print("Starting batch job with", resamples, "resamples")

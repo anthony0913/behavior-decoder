@@ -3,8 +3,35 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 
+class Display():
+    def __init__(self, filename, heatmaps, cols=5, rows=10):
+        self.heatmaps = heatmaps
+        self.filename = filename
+        self.generate_pdf(heatmaps, cols, rows)
 
-class Clean:
+    def generate_pdf(self, heatmaps, cols, rows):
+        num_plots = self.heatmaps.shape[0]
+        pages = 1 + num_plots // (cols * rows)
+        with PdfPages(self.filename) as pdf:
+            for page in range(pages):
+                fig, axes = plt.subplots(rows)
+                fig.suptitle(f"Heatmaps Page {page+1}", fontsize=20)
+
+                for row in range(rows):
+                    for col in range(cols):
+                        plot_num = page * rows * cols + row * cols + col
+                        if plot_num >= num_plots:
+                            break
+
+                        axes[row, col].imshow(heatmaps[plot_num], cmap='hot')
+                        axes[row, col].set_title(f'Heatmap {plot_num + 1}', fontsize=14)
+                        axes[row, col].axis('off')
+
+                pdf.savefig(fig)
+                plt.close()
+
+
+"""class Clean:
     def __init__(self, params_file, min_length):
         self.params_file = params_file
         self.min_length = min_length
@@ -126,4 +153,4 @@ cleaned_params_0 = clean.get_cleaned_params_0()
 #heatmap = Heatmaps("data.csv", "params.csv", freqs=[0,1,2,4,5,8,9], output_file=output_file)
 #transform.generate_heatmaps(cleaned_params_1, cleaned_params_0, output_file, freqs=np.arange(1,10))
 #transform.generate_heatmaps(cleaned_params_1, cleaned_params_0, "heatmaps2.pdf", freqs=[0,1,2,4,5,8,9])
-transform.generate_heatmaps(cleaned_params_1, cleaned_params_0, "heatmaps2.pdf", freqs=[3])
+transform.generate_heatmaps(cleaned_params_1, cleaned_params_0, "heatmaps2.pdf", freqs=[3])"""
