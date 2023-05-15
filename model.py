@@ -7,6 +7,8 @@ from sklearn.decomposition import PCA
 from sklearn.metrics.pairwise import cosine_similarity
 from collections import defaultdict
 from tqdm import tqdm
+from scipy.cluster.hierarchy import dendrogram, linkage
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 
 import multiprocessing
 import visualization as vis
@@ -39,10 +41,28 @@ class Optimizer:
         #vis.Display("neg", neg)
         g = -5000 * np.ones((1, pos.shape[1]))
         temp = np.vstack((pos, g))
-        temp = np.vstack((temp, neg))
+        #temp = np.vstack((temp, neg))
 
-        plt.imshow(temp)
-        plt.show()
+        #plt.imshow(temp)
+        #plt.show()
+
+        """Z = linkage(pos, method="ward")
+        plt.figure(figsize=(10, 5))
+        dendrogram(Z)
+        plt.xlabel('Trials')
+        plt.ylabel('Distance')
+        plt.title('Positive Trials')
+        plt.show()"""
+
+        print(pos.shape, neg.shape)
+        X = np.concatenate((pos, neg), axis=0)
+        y = np.concatenate((np.ones(pos.shape[0]), np.zeros(neg.shape[0])))
+        print(X.shape, y.shape)
+        lda = LinearDiscriminantAnalysis()
+        model = LinearDiscriminantAnalysis()
+        lda.fit(X, y)
+        X_lda = lda.transform(X)
+        print(X_lda)
 
     def sort(self, mat):
         sim = cosine_similarity(mat)
@@ -67,7 +87,7 @@ class Optimizer:
         return output
 
 
-    def optimize(self, randomize=False):
+    def optimize(self, randomize=False, lda=True):
         acc = np.zeros(self.resamples)
         for resample in range(self.resamples):
             # Reset train/eval trials
@@ -99,9 +119,14 @@ class Optimizer:
                 eval_data[trial, :] = primitive
 
             # Model
-            model = SVC(random_state=0, cache_size=7000, kernel=self.kernel)
-            model.fit(train_data, train_trials[:, -1])
-            acc[resample] = model.score(eval_data, eval_trials[:,-1])
+            if lda:
+                model = LinearDiscriminantAnalysis()
+                model.fit(train_data, train_trials[:, -1])
+                acc[resample] = model.score(eval_data, eval_trials[:, -1])
+            else:
+                model = SVC(random_state=0, cache_size=7000, kernel=self.kernel)
+                model.fit(train_data, train_trials[:, -1])
+                acc[resample] = model.score(eval_data, eval_trials[:, -1])
         return acc
 
     def split(self, params, randomize=False):
